@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: telegram_bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - ICBC_USERNAME=${ICBC_USERNAME}
+      - ICBC_PASSWORD=${ICBC_PASSWORD}
+      - EXAM_TYPE=${EXAM_TYPE}
+      - LAST_NAME=${LAST_NAME}
+      - LICENSE_NUMBER=${LICENSE_NUMBER}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+    restart: always
