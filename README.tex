@@ -1,0 +1,109 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{graphicx}
+
+\title{\Huge \textbf{Telegram Bot \& Private Backend for Appointment Monitoring}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{\textcolor{red}{⚠ Disclaimer}}
+This project is created \textbf{for educational purposes only}. \textbf{Commercial use is strictly prohibited} and may be \textbf{illegal} depending on your jurisdiction. The author is \textbf{not responsible} for any misuse of this software.
+
+\section*{📌 Features}
+\begin{itemize}
+    \item ✅ Telegram bot updates a message in a channel periodically.
+    \item ✅ Backend fetches appointment data securely.
+    \item ✅ Bot deletes old messages and sends new updates only when needed.
+    \item ✅ Dockerized for easy deployment.
+    \item ✅ Backend is private and only accessible inside Docker.
+\end{itemize}
+
+\section*{📽 Demo Video}
+\begin{center}
+    \href{https://your-video-link-here}{\includegraphics[width=0.8\textwidth]{https://via.placeholder.com/800x450?text=Demo+Video}}
+\end{center}
+
+\section*{🚀 Installation \& Usage}
+
+\subsection*{1️⃣ Clone the Repository}
+\begin{verbatim}
+git clone https://github.com/yourusername/telegram-appointment-bot.git
+cd telegram-appointment-bot
+\end{verbatim}
+
+\subsection*{2️⃣ Configure \texttt{.env} Files}
+Create \texttt{.env} files inside both \textbf{backend} and \textbf{bot} directories.
+
+\subsubsection*{Backend (\texttt{/backend/.env})}
+\begin{verbatim}
+PORT=3000
+EXAM_TYPE=G
+LAST_NAME=YourLastName
+LICENSE_NUMBER=123456
+\end{verbatim}
+
+\subsubsection*{Bot (\texttt{/bot/.env})}
+\begin{verbatim}
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHANNEL_ID=your_channel_id
+API_URL=http://backend:3000/appointments  # Use service name inside Docker
+\end{verbatim}
+
+\subsection*{3️⃣ Build \& Run Using Docker}
+\begin{verbatim}
+docker-compose up -d --build
+\end{verbatim}
+
+\textbf{Note:} The bot will \textbf{start fetching and updating appointments}, and the backend will run \textbf{privately inside Docker}.
+
+\section*{📜 API Endpoints (Backend)}
+\begin{center}
+\begin{tabular}{|c|l|l|}
+\hline
+\textbf{Method} & \textbf{Endpoint} & \textbf{Description} \\
+\hline
+GET & \texttt{/appointments} & Fetch all available appointments \\
+GET & \texttt{/appointments/:locationId} & Fetch appointments for a specific location \\
+GET & \texttt{/locations} & Get available locations \\
+\hline
+\end{tabular}
+\end{center}
+
+\section*{🛠 Development}
+
+\subsection*{Backend}
+\begin{verbatim}
+cd backend
+npm install
+npm run dev
+\end{verbatim}
+
+\subsection*{Bot}
+\begin{verbatim}
+cd bot
+npm install
+npm run dev
+\end{verbatim}
+
+\section*{📜 Stopping \& Removing the Containers}
+\begin{verbatim}
+docker-compose down
+\end{verbatim}
+
+\section*{⚠ Legal Disclaimer}
+This project is \textbf{strictly for educational purposes}. \\
+Using this bot for \textbf{commercial purposes} is \textbf{illegal} and may \textbf{violate terms of service}. \\
+The author \textbf{assumes no responsibility} for any misuse of this software.
+
+\section*{📜 License}
+This project is \textbf{open-source} but \textbf{not for commercial use}.
+
+\section*{🤝 Contributing}
+Pull requests are welcome! Feel free to \textbf{fork this repo} and suggest improvements. 🚀
+
+\end{document}
