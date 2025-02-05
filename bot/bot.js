@@ -1,0 +1,91 @@
+require('dotenv').config();
+const { Telegraf } = require('telegraf');
+const axios = require('axios');
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
+const API_URL = process.env.API_URL || 'http://localhost:3000/appointments';
+
+const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
+
+let lastMessageId = null; // Store the last message ID to delete
+let lastMessageText = ""; // Store last sent text to prevent unnecessary updates
+
+// Fetch appointments using Axios
+async function fetchAppointments() {
+    try {
+        const { data } = await axios.get(API_URL);
+
+        if (!data.appointments || data.appointments.length === 0) {
+            return "No appointments available within the next 2 weeks.";
+        }
+
+        console.log(data.appointments)
+        return data.appointments
+        .map(app => `📍 *${app.location.name}*\n _${app.location.postalCode}_\n📅 ${app.date} - ${app.dayOfWeek} - ${app.startTime}`)
+        .join("\n\n");
+    } catch (error) {
+        console.error("❌ Error fetching appointments:", error.message);
+        return "⚠️ Error fetching appointment data.";
+    }
+}
+
+// Generate a random interval (3 to 21 minutes, in steps of 3)
+function getRandomUpdateInterval() {
+    const possibleIntervals = [3, 6, 9, 12, 15, 18, 21]; // Valid steps
+    return possibleIntervals[Math.floor(Math.random() * possibleIntervals.length)];
+}
+
+// Send a new message and delete the previous one if the content has changed
+async function updateMessage() {
+    try {
+        const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}`;
+
+        if (newMessageText === lastMessageText) {
+            console.log("✅ No changes in appointments, skipping update.");
+        } else {
+            // If a previous message exists, delete it
+            if (lastMessageId) {
+                try {
+                    await bot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, lastMessageId);
+                    console.log("🗑️ Deleted previous message.");
+                } catch (deleteError) {
+                    console.error("⚠️ Error deleting previous message:", deleteError.message);
+                }
+            }
+
+            // Send new message
+            const sentMessage = await bot.telegram.sendMessage(
+                TELEGRAM_CHANNEL_ID,
+                newMessageText,
+                { parse_mode: "Markdown" }
+            );
+
+            // Store new message details
+            lastMessageId = sentMessage.message_id;
+            lastMessageText = newMessageText;
+
+            console.log("📢 Sent new message.");
+        }
+    } catch (error) {
+        console.error("❌ Error updating message:", error.message);
+    }
+
+    // Schedule the next update in 3 to 21 minutes (random step of 3 minutes)
+    const nextUpdate = getRandomUpdateInterval();
+    console.log(`🔄 Next update in ${nextUpdate} minutes`);
+    setTimeout(updateMessage, nextUpdate * 60 * 1000);
+}
+
+// Start the routine
+updateMessage();
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    console.log("⚠️ Bot stopped.");
+    process.exit();
+});
+process.on('SIGTERM', () => {
+    console.log("⚠️ Bot stopped.");
+    process.exit();
+});

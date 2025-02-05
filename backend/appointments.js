@@ -4,24 +4,13 @@ require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs-extra');
 
+const locations = require('./locations');
+
 // ICBC API details
 const ICBC_API_URL = 'https://onlinebusiness.icbc.com/deas-api/v1/web/getAvailableAppointments';
 const LOGIN_API_URL = 'https://onlinebusiness.icbc.com/deas-api/v1/webLogin/webLogin';
 const TOKEN_FILE = './bearer_token.json';
 
-// Location mapping
-const locations = {
-  153: "Langley driver licensing (Willowbrook Center)",
-  73: "Port Coquitlam driver licensing",
-  281: "Guildford Boardwalk road test centre (Boardwalk mall)",
-  11: "Surrey driver licensing",
-  1: "Abbotsford driver licensing (Clearbrook Plaza)",
-  2: "Burnaby driver licensing",
-  8: "North Vancouver driver licensing",
-  93: "Richmond driver licensing (Lansdowne Centre mall)",
-  9: "Vancouver driver licensing (Point Grey)",
-  3: "Chilliwack driver licensing",
-};
 
 // Logging function
 function logMessage(message) {
@@ -148,9 +137,9 @@ function formatAppointments(appointments) {
   return appointments
     .sort((a, b) => new Date(a.appointmentDt.date) - new Date(b.appointmentDt.date)) // Sort by appointment date
     .map(appt => {
-      const locationName = locations[appt.posId] || 'Unknown Location';
+      const location = locations[appt.posId] || 'Unknown Location';
       return {
-        location: locationName,
+        location: location,
         date: appt.appointmentDt.date,
         dayOfWeek: appt.appointmentDt.dayOfWeek,
         startTime: appt.startTm,
@@ -173,5 +162,6 @@ module.exports = {
   filterAppointmentsWithin2Weeks,
   formatAppointments,
   sendLongMessage,
-  login // Exporting login function for use in other modules
+  login,
+  getBearerToken
 };

@@ -3,11 +3,11 @@
 require('dotenv').config();
 const express = require('express');
 const { fetchAppointments, filterAppointmentsWithin2Weeks, formatAppointments, login, getBearerToken } = require('./appointments');
-const bot = require('./bot');
-const fs = require('fs-extra');
+const locations = require('./locations');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 
 // Middleware to parse JSON
 app.use(express.json());
@@ -23,20 +23,7 @@ app.get('/login', async (req, res) => {
 });
 
 // Route to get all location details (including ID)
-app.get('/locations', (req, res) => {
-    const locations = {
-      153: "Langley driver licensing (Willowbrook Center)",
-      73: "Port Coquitlam driver licensing",
-      281: "Guildford Boardwalk road test centre (Boardwalk mall)",
-      11: "Surrey driver licensing",
-      1: "Abbotsford driver licensing (Clearbrook Plaza)",
-      2: "Burnaby driver licensing",
-      8: "North Vancouver driver licensing",
-      93: "Richmond driver licensing (Lansdowne Centre mall)",
-      9: "Vancouver driver licensing (Point Grey)",
-      3: "Chilliwack driver licensing",
-    };
-  
+app.get('/locations', (req, res) => {  
     // Convert locations object into an array of objects with id and name
     const locationDetails = Object.keys(locations).map(id => ({
       id: id,
@@ -67,7 +54,7 @@ app.get('/appointments/:locationId', async (req, res) => {
 app.get('/appointments', async (req, res) => {
     try {
       let allAppointments = [];
-      const locationIds = Object.keys(process.env.LOCATIONS); // Assuming locations are provided via environment variables
+      const locationIds = Object.keys(locations); // Assuming locations are provided via environment variables
       for (const locationId of locationIds) {
         const appointments = await fetchAppointments(locationId);
         if (appointments) {
@@ -92,7 +79,7 @@ app.get('/api/arguments', (req, res) => {
     examType: process.env.EXAM_TYPE,
     lastName: process.env.LAST_NAME,
     licenseNumber: process.env.LICENSE_NUMBER,
-    locations: process.env.LOCATIONS,
+    locations,
   };
   res.json(args);
 });
