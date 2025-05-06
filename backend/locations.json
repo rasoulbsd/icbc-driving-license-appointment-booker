@@ -1,29 +1,4 @@
 {
-    "153": {
-        "name": "Langley (Willowbrook Center)",
-        "address": "19950 Willowbrook Dr j7",
-        "postalCode": "Langley BC V2Y 1K9"
-    },
-    "73": {
-        "name": "Port Coquitlam driver licensing",
-        "address": "1930 Oxford Connector",
-        "postalCode": "Port Coquitlam BC V3C 0A4"
-    },
-    "281": {
-        "name": "Guildford Boardwalk road test centre (Boardwalk mall)",
-        "address": "15285 - 101st Ave",
-        "postalCode": "Surrey BC V3R 9V8"
-    },
-    "11": {
-        "name": "Surrey",
-        "address": "13426 78 Ave",
-        "postalCode": "Surrey BC V3W 8J6"
-    },
-    "1": {
-        "name": "Abbotsford (Clearbrook Plaza)",
-        "address": "31935 S Fraser Way #150",
-        "postalCode": "Abbotsford BC V2T 5N7"
-    },
     "2": {
         "name": "Burnaby",
         "address": "3880 Lougheed Hwy",
@@ -34,24 +9,9 @@
         "address": "1331 Marine Dr",
         "postalCode": "North Vancouver BC V7P 3E5"
     },
-    "93": {
-        "name": "Richmond (Lansdowne Centre mall)",
-        "address": "5300 No 3 Rd #402",
-        "postalCode": "Richmond BC V6X 2X9"
-    },
     "9": {
         "name": "Vancouver (Point Grey)",
         "address": "4126 Macdonald St",
         "postalCode": "Vancouver BC V6L 2P2"
-    },
-    "3": {
-        "name": "Chilliwack",
-        "address": "46052 Chilliwack Central Rd",
-        "postalCode": "Chilliwack BC V2P 1J6"
-    },
-    "279": {
-        "name": "Maple Ridge claim centre (Dewdney Trunk Road)",
-        "address": "22811 Dewdney Trunk Road",
-        "postalCode": "Maple Ridge BC V9B 2S4"
     }
 }

@@ -43,7 +43,7 @@ app.get('/appointments/:locationId', async (req, res) => {
       const formattedAppointments = formatAppointments(upcomingAppointments);
       res.json({ appointments: formattedAppointments });
     } else {
-      res.json({ message: 'No appointments available within the next 2 weeks.' });
+      res.json({ message: 'No appointments available within the next 2 months.' });
     }
   } catch (error) {
     res.status(500).json({ error: 'Error fetching appointments', message: error.message });
@@ -66,7 +66,7 @@ app.get('/appointments', async (req, res) => {
         const formattedAppointments = formatAppointments(upcomingAppointments); // Format the appointments as a list
         res.json({ appointments: formattedAppointments });
       } else {
-        res.json({ message: 'No appointments available within the next 2 weeks.' });
+        res.json({ message: 'No appointments available within the next 2 months.' });
       }
     } catch (error) {
       res.status(500).json({ error: 'Error fetching appointments', message: error.message });

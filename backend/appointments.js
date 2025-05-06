@@ -124,7 +124,7 @@ async function fetchAppointments(locationId, limit = 10) {
 function filterAppointmentsWithin2Weeks(appointments) {
   const today = new Date();
   const twoWeeksFromNow = new Date();
-  twoWeeksFromNow.setDate(today.getDate() + 14);
+  twoWeeksFromNow.setDate(today.getDate() + 60);
 
   return appointments.filter(appt => {
     const apptDate = new Date(appt.appointmentDt.date);

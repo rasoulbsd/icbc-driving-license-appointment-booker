@@ -17,7 +17,7 @@ async function fetchAppointments() {
         const { data } = await axios.get(API_URL);
 
         if (!data.appointments || data.appointments.length === 0) {
-            return "No appointments available within the next 2 weeks.";
+            return "No appointments available within the next 2 months.";
         }
 
         console.log(data.appointments)
@@ -32,7 +32,7 @@ async function fetchAppointments() {
 
 // Generate a random interval (3 to 21 minutes, in steps of 3)
 function getRandomUpdateInterval() {
-    const possibleIntervals = [3, 6, 9, 12, 15, 18, 21]; // Valid steps
+    const possibleIntervals = [1, 2, 3]; // Valid steps
     return possibleIntervals[Math.floor(Math.random() * possibleIntervals.length)];
 }
 
