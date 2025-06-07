@@ -13,5 +13,10 @@
         "name": "Vancouver (Point Grey)",
         "address": "4126 Macdonald St",
         "postalCode": "Vancouver BC V6L 2P2"
+    },
+    "274": {
+        "name": "Burnaby claim centre (Wayburne Drive)",
+        "address": "4399 Wayburne Drive",
+        "postalCode": "Burnaby BC V5G 3X7"
     }
 }

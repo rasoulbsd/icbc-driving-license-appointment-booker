@@ -53,5 +53,10 @@
         "name": "Maple Ridge claim centre (Dewdney Trunk Road)",
         "address": "22811 Dewdney Trunk Road",
         "postalCode": "Maple Ridge BC V9B 2S4"
+    },
+    "274": {
+        "name": "Burnaby claim centre (Wayburne Drive)",
+        "address": "4399 Wayburne Drive",
+        "postalCode": "Burnaby BC V5G 3X7"
     }
 }
