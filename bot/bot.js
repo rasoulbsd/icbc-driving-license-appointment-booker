@@ -40,13 +40,10 @@ function getRandomUpdateInterval() {
 async function updateMessage() {
     try {
         const currentTime = new Date().toLocaleString('en-CA', {
-            timeZone: 'Canada/Pacific',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
+            timeStyle: "short",
+            dateStyle: "short",
+            hour12: false,
+            timeZone: "Canada/Pacific"
         });
         
         const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_`;
@@ -69,13 +66,10 @@ async function updateMessage() {
         // Send error message when there's an error
         try {
             const errorMessage = `⚠️ *Error occurred while fetching appointments*\n\n_Error: ${error.message}_\n\n_Time: ${new Date().toLocaleString('en-CA', {
-                timeZone: 'Canada/Pacific',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
+                timeStyle: "short",
+                dateStyle: "short",
+                hour12: false,
+                timeZone: "Canada/Pacific"
             })}_`;
             
             await bot.telegram.sendMessage(
