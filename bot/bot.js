@@ -40,7 +40,7 @@ function getRandomUpdateInterval() {
 async function updateMessage() {
     try {
         const currentTime = new Date().toLocaleString('en-US', {
-            timeZone: 'America/Los_Angeles',
+            timeZone: 'Canada/Vancouver',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -69,7 +69,7 @@ async function updateMessage() {
         // Send error message when there's an error
         try {
             const errorMessage = `⚠️ *Error occurred while fetching appointments*\n\n_Error: ${error.message}_\n\n_Time: ${new Date().toLocaleString('en-US', {
-                timeZone: 'America/Los_Angeles',
+                timeZone: 'Canada/Vancouver',
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
