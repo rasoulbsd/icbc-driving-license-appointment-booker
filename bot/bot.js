@@ -51,34 +51,42 @@ async function updateMessage() {
         
         const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_`;
 
-        if (newMessageText === lastMessageText) {
-            console.log("✅ No changes in appointments, skipping update.");
-        } else {
-            // If a previous message exists, delete it
-            if (lastMessageId) {
-                try {
-                    await bot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, lastMessageId);
-                    console.log("🗑️ Deleted previous message.");
-                } catch (deleteError) {
-                    console.error("⚠️ Error deleting previous message:", deleteError.message);
-                }
-            }
+        // Always send a new message
+        const sentMessage = await bot.telegram.sendMessage(
+            TELEGRAM_CHANNEL_ID,
+            newMessageText,
+            { parse_mode: "Markdown" }
+        );
 
-            // Send new message
-            const sentMessage = await bot.telegram.sendMessage(
-                TELEGRAM_CHANNEL_ID,
-                newMessageText,
-                { parse_mode: "Markdown" }
-            );
+        // Store new message details
+        lastMessageId = sentMessage.message_id;
+        lastMessageText = newMessageText;
 
-            // Store new message details
-            lastMessageId = sentMessage.message_id;
-            lastMessageText = newMessageText;
-
-            console.log("📢 Sent new message.");
-        }
+        console.log("📢 Sent new message.");
     } catch (error) {
         console.error("❌ Error updating message:", error.message);
+        
+        // Send error message when there's an error
+        try {
+            const errorMessage = `⚠️ *Error occurred while fetching appointments*\n\n_Error: ${error.message}_\n\n_Time: ${new Date().toLocaleString('en-US', {
+                timeZone: 'America/New_York',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            })}_`;
+            
+            await bot.telegram.sendMessage(
+                TELEGRAM_CHANNEL_ID,
+                errorMessage,
+                { parse_mode: "Markdown" }
+            );
+            console.log("📢 Sent error message.");
+        } catch (errorSendError) {
+            console.error("❌ Error sending error message:", errorSendError.message);
+        }
     }
 
     // Schedule the next update in 3 to 21 minutes (random step of 3 minutes)
