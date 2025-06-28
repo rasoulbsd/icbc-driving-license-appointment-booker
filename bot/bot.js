@@ -39,7 +39,17 @@ function getRandomUpdateInterval() {
 // Send a new message and delete the previous one if the content has changed
 async function updateMessage() {
     try {
-        const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}`;
+        const currentTime = new Date().toLocaleString('en-US', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
+        const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_`;
 
         if (newMessageText === lastMessageText) {
             console.log("✅ No changes in appointments, skipping update.");
