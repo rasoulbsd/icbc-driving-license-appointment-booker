@@ -39,14 +39,29 @@ function getRandomUpdateInterval() {
 // Send a new message and delete the previous one if the content has changed
 async function updateMessage() {
     try {
-        const currentTime = new Date().toLocaleString('en-CA', {
-            timeStyle: "short",
-            dateStyle: "short",
-            hour12: false,
-            timeZone: "Canada/Pacific"
+        const currentTime = new Date().toLocaleString('en-US', {
+            timeZone: 'America/Vancouver',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
         });
         
-        const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_`;
+        // Calculate next update time
+        const nextUpdate = getRandomUpdateInterval();
+        const nextUpdateTime = new Date(Date.now() + nextUpdate * 60 * 1000).toLocaleString('en-US', {
+            timeZone: 'America/Vancouver',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
+        const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
 
         // Always send a new message
         const sentMessage = await bot.telegram.sendMessage(
@@ -65,11 +80,14 @@ async function updateMessage() {
         
         // Send error message when there's an error
         try {
-            const errorMessage = `⚠️ *Error occurred while fetching appointments*\n\n_Error: ${error.message}_\n\n_Time: ${new Date().toLocaleString('en-CA', {
-                timeStyle: "short",
-                dateStyle: "short",
-                hour12: false,
-                timeZone: "Canada/Pacific"
+            const errorMessage = `⚠️ *Error occurred while fetching appointments*\n\n_Error: ${error.message}_\n\n_Time: ${new Date().toLocaleString('en-US', {
+                timeZone: 'America/Vancouver',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
             })}_`;
             
             await bot.telegram.sendMessage(
