@@ -32,7 +32,7 @@ async function fetchAppointments() {
 
 // Generate a random interval (3 to 21 minutes, in steps of 3)
 function getRandomUpdateInterval() {
-    const possibleIntervals = [1.5, 2, 3]; // Valid steps
+    const possibleIntervals = [1, 1.25, 1.5, 1.75, 2]; // Valid steps
     return possibleIntervals[Math.floor(Math.random() * possibleIntervals.length)];
 }
 
