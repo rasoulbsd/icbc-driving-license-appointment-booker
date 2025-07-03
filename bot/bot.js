@@ -5,6 +5,7 @@ const axios = require('axios');
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const API_URL = process.env.API_URL || 'http://localhost:3000/appointments';
+const DEBUG_MODE = process.env.DEBUG_MODE === 'true'; // New environment variable
 
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
@@ -41,11 +42,9 @@ async function updateMessage() {
     try {
         const currentTime = new Date().toLocaleString('en-US', {
             timeZone: 'America/Vancouver',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
             hour12: true
         });
         
@@ -53,28 +52,56 @@ async function updateMessage() {
         const nextUpdate = getRandomUpdateInterval();
         const nextUpdateTime = new Date(Date.now() + nextUpdate * 60 * 1000).toLocaleString('en-US', {
             timeZone: 'America/Vancouver',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
             hour12: true
         });
         
         const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
 
-        // Always send a new message
-        const sentMessage = await bot.telegram.sendMessage(
-            TELEGRAM_CHANNEL_ID,
-            newMessageText,
-            { parse_mode: "Markdown" }
-        );
+        if (DEBUG_MODE) {
+            // Debug mode: Always send new message
+            const sentMessage = await bot.telegram.sendMessage(
+                TELEGRAM_CHANNEL_ID,
+                newMessageText,
+                { parse_mode: "Markdown" }
+            );
 
-        // Store new message details
-        lastMessageId = sentMessage.message_id;
-        lastMessageText = newMessageText;
+            // Store new message details
+            lastMessageId = sentMessage.message_id;
+            lastMessageText = newMessageText;
 
-        console.log("📢 Sent new message.");
+            console.log("📢 [DEBUG MODE] Sent new message.");
+        } else {
+            // Production mode: Only update if content has changed
+            if (newMessageText !== lastMessageText) {
+                // Delete previous message if it exists
+                if (lastMessageId) {
+                    try {
+                        await bot.telegram.deleteMessage(TELEGRAM_CHANNEL_ID, lastMessageId);
+                        console.log("🗑️ Deleted previous message.");
+                    } catch (deleteError) {
+                        console.log("⚠️ Could not delete previous message (might be too old):", deleteError.message);
+                    }
+                }
+
+                // Send new message
+                const sentMessage = await bot.telegram.sendMessage(
+                    TELEGRAM_CHANNEL_ID,
+                    newMessageText,
+                    { parse_mode: "Markdown" }
+                );
+
+                // Store new message details
+                lastMessageId = sentMessage.message_id;
+                lastMessageText = newMessageText;
+
+                console.log("📢 [PRODUCTION MODE] Updated message with new content.");
+            } else {
+                console.log("📢 [PRODUCTION MODE] No changes detected, keeping existing message.");
+            }
+        }
     } catch (error) {
         console.error("❌ Error updating message:", error.message);
         
@@ -82,11 +109,9 @@ async function updateMessage() {
         try {
             const errorMessage = `⚠️ *Error occurred while fetching appointments*\n\n_Error: ${error.message}_\n\n_Time: ${new Date().toLocaleString('en-US', {
                 timeZone: 'America/Vancouver',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
                 hour: '2-digit',
                 minute: '2-digit',
+                second: '2-digit',
                 hour12: true
             })}_`;
             
@@ -108,6 +133,7 @@ async function updateMessage() {
 }
 
 // Start the routine
+console.log(`🚀 Bot started in ${DEBUG_MODE ? 'DEBUG' : 'PRODUCTION'} mode`);
 updateMessage();
 
 // Graceful shutdown

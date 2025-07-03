@@ -17,6 +17,8 @@ software.
 
 -   ✅ Bot deletes old messages and sends new updates only when needed.
 
+-   ✅ Dual-mode operation: Debug mode (always send new messages) and Production mode (update only when changes detected).
+
 -   ✅ Dockerized for easy deployment.
 
 -   ✅ Backend is private and only accessible inside Docker.
@@ -50,6 +52,7 @@ Create `.env` files inside both **backend** and **bot** directories.
     TELEGRAM_BOT_TOKEN=your_bot_token
     TELEGRAM_CHANNEL_ID=your_channel_id
     API_URL=http://backend:3000/appointments  # Use service name inside Docker
+    DEBUG_MODE=false  # Set to 'true' for debug mode, 'false' for production mode
 
 ## 3️⃣ Build & Run Using Docker {#build-run-using-docker .unnumbered}
 
@@ -67,6 +70,22 @@ the backend will run **privately inside Docker**.
       GET      `/appointments/:locationId`   Fetch appointments for a specific location
       GET      `/locations`                  Get available locations
 :::
+
+# 🤖 Bot Operation Modes {#bot-operation-modes .unnumbered}
+
+## Debug Mode (`DEBUG_MODE=true`) {#debug-mode .unnumbered}
+
+-   Always sends new messages every update cycle
+-   Useful for testing and development
+-   Shows all update activity in the channel
+-   May generate more notifications
+
+## Production Mode (`DEBUG_MODE=false`) {#production-mode .unnumbered}
+
+-   Only updates messages when appointment data changes
+-   Deletes previous message before sending new one
+-   Reduces unnecessary notifications
+-   Ideal for production use
 
 # 🛠 Development {#development .unnumbered}
 
