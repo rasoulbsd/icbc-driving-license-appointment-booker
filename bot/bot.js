@@ -109,10 +109,11 @@ async function updateMessage() {
                     }
                 }
 
-                // Send new message
+                // Send new message (production mode: no timestamps)
+                const productionMessageText = `🚦 *Available Appointments:*\n\n${appointmentContent}`;
                 const sentMessage = await bot.telegram.sendMessage(
                     TELEGRAM_CHANNEL_ID,
-                    newMessageText,
+                    productionMessageText,
                     { parse_mode: "Markdown" }
                 );
 
