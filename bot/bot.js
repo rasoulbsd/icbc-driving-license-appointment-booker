@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '../.env' });
 const { Telegraf } = require('telegraf');
 const axios = require('axios');
 
@@ -7,10 +7,29 @@ const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const API_URL = process.env.API_URL || 'http://localhost:3000/appointments';
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true'; // New environment variable
 
+// Configurable update intervals (in minutes)
+const UPDATE_INTERVALS = process.env.UPDATE_INTERVALS ? 
+  process.env.UPDATE_INTERVALS.split(',').map(x => parseFloat(x.trim())) : 
+  [1, 1.25, 1.5, 1.75, 2]; // Default intervals
+
+// Configurable appointment search period (in days)
+const APPOINTMENT_SEARCH_DAYS = parseInt(process.env.APPOINTMENT_SEARCH_DAYS) || 60; // Default 60 days
+
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
 let lastMessageId = null; // Store the last message ID to delete
 let lastMessageText = ""; // Store last sent text to prevent unnecessary updates
+
+// Helper function to get human-readable time period
+function getTimePeriodText(days) {
+  if (days === 1) return '1 day';
+  if (days < 7) return `${days} days`;
+  if (days === 7) return '1 week';
+  if (days < 30) return `${Math.floor(days / 7)} weeks`;
+  if (days === 30) return '1 month';
+  if (days < 365) return `${Math.floor(days / 30)} months`;
+  return `${Math.floor(days / 365)} years`;
+}
 
 // Fetch appointments using Axios
 async function fetchAppointments() {
@@ -18,7 +37,8 @@ async function fetchAppointments() {
         const { data } = await axios.get(API_URL);
 
         if (!data.appointments || data.appointments.length === 0) {
-            return "No appointments available within the next 2 months.";
+            const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
+            return `No appointments available within the next ${timePeriod}.`;
         }
 
         console.log(data.appointments)
@@ -31,10 +51,9 @@ async function fetchAppointments() {
     }
 }
 
-// Generate a random interval (3 to 21 minutes, in steps of 3)
+// Generate a random interval from configured intervals
 function getRandomUpdateInterval() {
-    const possibleIntervals = [1, 1.25, 1.5, 1.75, 2]; // Valid steps
-    return possibleIntervals[Math.floor(Math.random() * possibleIntervals.length)];
+    return UPDATE_INTERVALS[Math.floor(Math.random() * UPDATE_INTERVALS.length)];
 }
 
 // Send a new message and delete the previous one if the content has changed
@@ -126,7 +145,7 @@ async function updateMessage() {
         }
     }
 
-    // Schedule the next update in 3 to 21 minutes (random step of 3 minutes)
+    // Schedule the next update
     const nextUpdate = getRandomUpdateInterval();
     console.log(`🔄 Next update in ${nextUpdate} minutes`);
     setTimeout(updateMessage, nextUpdate * 60 * 1000);
@@ -134,6 +153,8 @@ async function updateMessage() {
 
 // Start the routine
 console.log(`🚀 Bot started in ${DEBUG_MODE ? 'DEBUG' : 'PRODUCTION'} mode`);
+console.log(`⏰ Update intervals: ${UPDATE_INTERVALS.join(', ')} minutes`);
+console.log(`📅 Searching appointments within ${getTimePeriodText(APPOINTMENT_SEARCH_DAYS)}`);
 updateMessage();
 
 // Graceful shutdown

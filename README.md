@@ -23,6 +23,8 @@ software.
 
 -   ✅ Backend is private and only accessible inside Docker.
 
+-   ✅ Single `.env` file for all configuration.
+
 # 📽 Demo Video {#demo-video .unnumbered}
 
 ::: center
@@ -36,23 +38,25 @@ software.
     git clone https://github.com/yourusername/telegram-appointment-bot.git
     cd telegram-appointment-bot
 
-## 2️⃣ Configure `.env` Files {#configure-.env-files .unnumbered}
+## 2️⃣ Configure `.env` File {#configure-.env-file .unnumbered}
 
-Create `.env` files inside both **backend** and **bot** directories.
+Create a single `.env` file in the project root directory. You can copy `env.example` to `.env` and modify the values.
 
-### Backend (`/backend/.env`) {#backend-backend.env .unnumbered}
+### Root `.env` File {#root-env-file .unnumbered}
 
+    # Backend Configuration
     PORT=3000
     EXAM_TYPE=G
     LAST_NAME=YourLastName
     LICENSE_NUMBER=123456
+    APPOINTMENT_SEARCH_DAYS=60
 
-### Bot (`/bot/.env`) {#bot-bot.env .unnumbered}
-
+    # Bot Configuration
     TELEGRAM_BOT_TOKEN=your_bot_token
     TELEGRAM_CHANNEL_ID=your_channel_id
     API_URL=http://backend:3000/appointments  # Use service name inside Docker
     DEBUG_MODE=false  # Set to 'true' for debug mode, 'false' for production mode
+    UPDATE_INTERVALS=1,1.25,1.5,1.75,2  # Update intervals in minutes (comma-separated)
 
 ## 3️⃣ Build & Run Using Docker {#build-run-using-docker .unnumbered}
 
@@ -86,6 +90,30 @@ the backend will run **privately inside Docker**.
 -   Deletes previous message before sending new one
 -   Reduces unnecessary notifications
 -   Ideal for production use
+
+# ⚙️ Configuration Options {#configuration-options .unnumbered}
+
+## Update Intervals (`UPDATE_INTERVALS`) {#update-intervals .unnumbered}
+
+-   Comma-separated list of update intervals in minutes
+-   Bot randomly selects from these intervals for each update
+-   Example: `1,1.25,1.5,1.75,2` (1 to 2 minutes)
+-   Default: `1,1.25,1.5,1.75,2`
+
+## Appointment Search Period (`APPOINTMENT_SEARCH_DAYS`) {#appointment-search-period .unnumbered}
+
+-   Number of days to search for available appointments
+-   Used in both backend and bot
+-   Affects the "No appointments available within the next X" message
+-   Default: `60` (2 months)
+-   Examples: `30` (1 month), `90` (3 months), `14` (2 weeks)
+
+## Port Configuration (`PORT`) {#port-configuration .unnumbered}
+
+-   Backend server port (default: `3000`)
+-   Docker Compose automatically maps this port to the host
+-   Format: `127.0.0.1:${PORT}:3000`
+-   Backend is only accessible from localhost for security
 
 # 🛠 Development {#development .unnumbered}
 

@@ -1,6 +1,6 @@
 // appointments.js
 
-require('dotenv').config();
+require('dotenv').config({ path: '../.env' });
 const axios = require('axios');
 const fs = require('fs-extra');
 
@@ -11,6 +11,19 @@ const ICBC_API_URL = 'https://onlinebusiness.icbc.com/deas-api/v1/web/getAvailab
 const LOGIN_API_URL = 'https://onlinebusiness.icbc.com/deas-api/v1/webLogin/webLogin';
 const TOKEN_FILE = './bearer_token.json';
 
+// Configurable appointment search period (in days)
+const APPOINTMENT_SEARCH_DAYS = parseInt(process.env.APPOINTMENT_SEARCH_DAYS) || 60; // Default 60 days
+
+// Helper function to get human-readable time period
+function getTimePeriodText(days) {
+  if (days === 1) return '1 day';
+  if (days < 7) return `${days} days`;
+  if (days === 7) return '1 week';
+  if (days < 30) return `${Math.floor(days / 7)} weeks`;
+  if (days === 30) return '1 month';
+  if (days < 365) return `${Math.floor(days / 30)} months`;
+  return `${Math.floor(days / 365)} years`;
+}
 
 // Logging function
 function logMessage(message) {
@@ -120,15 +133,15 @@ async function fetchAppointments(locationId, limit = 10) {
   }
 }
 
-// Filter appointments within 2 weeks
-function filterAppointmentsWithin2Weeks(appointments) {
+// Filter appointments within configured period
+function filterAppointmentsWithinPeriod(appointments) {
   const today = new Date();
-  const twoWeeksFromNow = new Date();
-  twoWeeksFromNow.setDate(today.getDate() + 60);
+  const futureDate = new Date();
+  futureDate.setDate(today.getDate() + APPOINTMENT_SEARCH_DAYS);
 
   return appointments.filter(appt => {
     const apptDate = new Date(appt.appointmentDt.date);
-    return apptDate >= today && apptDate <= twoWeeksFromNow;
+    return apptDate >= today && apptDate <= futureDate;
   });
 }
 
@@ -159,7 +172,7 @@ function sendLongMessage(chatId, text, bot) {
 
 module.exports = {
   fetchAppointments,
-  filterAppointmentsWithin2Weeks,
+  filterAppointmentsWithinPeriod,
   formatAppointments,
   sendLongMessage,
   login,

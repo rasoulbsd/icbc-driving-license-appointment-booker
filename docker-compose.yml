@@ -5,9 +5,9 @@ services:
     build: ./backend
     container_name: icbc-backend
     restart: always
-    env_file: ./backend/.env
+    env_file: ./.env
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     networks:
       - app_network
 
@@ -15,7 +15,7 @@ services:
     build: ./bot
     container_name: icbc-bot
     restart: always
-    env_file: ./bot/.env
+    env_file: ./.env
     depends_on:
       - backend
     networks:
