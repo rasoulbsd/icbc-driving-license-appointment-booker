@@ -18,7 +18,7 @@ const APPOINTMENT_SEARCH_DAYS = parseInt(process.env.APPOINTMENT_SEARCH_DAYS) ||
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
 let lastMessageId = null; // Store the last message ID to delete
-let lastMessageText = ""; // Store last sent text to prevent unnecessary updates
+let lastAppointmentContent = ""; // Store last appointment content to prevent unnecessary updates
 
 // Helper function to get human-readable time period
 function getTimePeriodText(days) {
@@ -77,7 +77,11 @@ async function updateMessage() {
             hour12: true
         });
         
-        const newMessageText = `🚦 *Available Appointments:*\n\n${await fetchAppointments()}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
+        // Get appointment content (without timestamps)
+        const appointmentContent = await fetchAppointments();
+        
+        // Create full message with timestamps
+        const newMessageText = `🚦 *Available Appointments:*\n\n${appointmentContent}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
 
         if (DEBUG_MODE) {
             // Debug mode: Always send new message
@@ -89,12 +93,12 @@ async function updateMessage() {
 
             // Store new message details
             lastMessageId = sentMessage.message_id;
-            lastMessageText = newMessageText;
+            lastAppointmentContent = appointmentContent;
 
             console.log("📢 [DEBUG MODE] Sent new message.");
         } else {
-            // Production mode: Only update if content has changed
-            if (newMessageText !== lastMessageText) {
+            // Production mode: Only update if appointment content has changed
+            if (appointmentContent !== lastAppointmentContent) {
                 // Delete previous message if it exists
                 if (lastMessageId) {
                     try {
@@ -114,7 +118,7 @@ async function updateMessage() {
 
                 // Store new message details
                 lastMessageId = sentMessage.message_id;
-                lastMessageText = newMessageText;
+                lastAppointmentContent = appointmentContent;
 
                 console.log("📢 [PRODUCTION MODE] Updated message with new content.");
             } else {
