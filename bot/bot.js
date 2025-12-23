@@ -4,7 +4,9 @@ const axios = require('axios');
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
+const TELEGRAM_CHANNEL_ID_ALL = process.env.TELEGRAM_CHANNEL_ID_ALL;
 const API_URL = process.env.API_URL || 'http://localhost:3000/appointments';
+const API_URL_ALL = process.env.API_URL_ALL || 'http://localhost:3000/appointments-all';
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true'; // New environment variable
 
 // Configurable update intervals (in minutes)
@@ -31,7 +33,7 @@ function getTimePeriodText(days) {
   return `${Math.floor(days / 365)} years`;
 }
 
-// Fetch appointments using Axios
+// Fetch appointments using Axios (for selected locations)
 async function fetchAppointments() {
     try {
         const { data } = await axios.get(API_URL);
@@ -48,6 +50,25 @@ async function fetchAppointments() {
     } catch (error) {
         console.error("❌ Error fetching appointments:", error.message);
         return "⚠️ Error fetching appointment data.";
+    }
+}
+
+// Fetch appointments for ALL locations
+async function fetchAppointmentsAll() {
+    try {
+        const { data } = await axios.get(API_URL_ALL);
+
+        if (!data.appointments || data.appointments.length === 0) {
+            const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
+            return `No appointments available within the next ${timePeriod}.`;
+        }
+
+        return data.appointments
+        .map(app => `📍 *${app.location.name}* (ID: ${app.location.id})\n _${app.location.postalCode}_\n📅 ${app.date} - ${app.dayOfWeek} - ${app.startTime}`)
+        .join("\n\n");
+    } catch (error) {
+        console.error("❌ Error fetching ALL-location appointments:", error.message);
+        return "⚠️ Error fetching ALL-location appointment data.";
     }
 }
 
@@ -79,9 +100,10 @@ async function updateMessage() {
         
         // Get appointment content (without timestamps)
         const appointmentContent = await fetchAppointments();
+        const allLocationsContent = TELEGRAM_CHANNEL_ID_ALL ? await fetchAppointmentsAll() : null;
         
         // Create full message with timestamps
-        const newMessageText = `🚦 *Available Appointments:*\n\n${appointmentContent}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
+        const newMessageText = `🚦 *Available Appointments (Selected Locations):*\n\n${appointmentContent}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
 
         if (DEBUG_MODE) {
             // Debug mode: Always send new message
@@ -94,6 +116,16 @@ async function updateMessage() {
             // Store new message details
             lastMessageId = sentMessage.message_id;
             lastAppointmentContent = appointmentContent;
+
+            // Also send ALL-locations message to secondary channel in debug mode (if configured)
+            if (TELEGRAM_CHANNEL_ID_ALL && allLocationsContent) {
+                const allText = `🌐 *Available Appointments (ALL Locations):*\n\n${allLocationsContent}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
+                await bot.telegram.sendMessage(
+                    TELEGRAM_CHANNEL_ID_ALL,
+                    allText,
+                    { parse_mode: "Markdown" }
+                );
+            }
 
             console.log("📢 [DEBUG MODE] Sent new message.");
         } else {
@@ -110,7 +142,7 @@ async function updateMessage() {
                 }
 
                 // Send new message (production mode: no timestamps)
-                const productionMessageText = `🚦 *Available Appointments:*\n\n${appointmentContent}`;
+                const productionMessageText = `🚦 *Available Appointments (Selected Locations):*\n\n${appointmentContent}`;
                 const sentMessage = await bot.telegram.sendMessage(
                     TELEGRAM_CHANNEL_ID,
                     productionMessageText,
@@ -120,6 +152,16 @@ async function updateMessage() {
                 // Store new message details
                 lastMessageId = sentMessage.message_id;
                 lastAppointmentContent = appointmentContent;
+
+                // Also send ALL-locations message to secondary channel (if configured)
+                if (TELEGRAM_CHANNEL_ID_ALL && allLocationsContent) {
+                    const allText = `🌐 *Available Appointments (ALL Locations):*\n\n${allLocationsContent}`;
+                    await bot.telegram.sendMessage(
+                        TELEGRAM_CHANNEL_ID_ALL,
+                        allText,
+                        { parse_mode: "Markdown" }
+                    );
+                }
 
                 console.log("📢 [PRODUCTION MODE] Updated message with new content.");
             } else {

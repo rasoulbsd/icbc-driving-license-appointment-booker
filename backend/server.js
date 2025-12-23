@@ -2,8 +2,9 @@
 
 require('dotenv').config({ path: '../.env' });
 const express = require('express');
-const { fetchAppointments, filterAppointmentsWithinPeriod, formatAppointments, login, getBearerToken } = require('./appointments');
+const { fetchAppointments, filterAppointmentsWithinPeriod, formatAppointments, login } = require('./appointments');
 const locations = require('./locations');
+const allLocations = require('./all-locations.json');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,13 +26,18 @@ function getTimePeriodText(days) {
 // Middleware to parse JSON
 app.use(express.json());
 
-// Route to log in and fetch bearer token
+// Route to log in to ICBC (validates credentials / session)
 app.get('/login', async (req, res) => {
   try {
-    const token = await login(); // Calls the login function from appointments.js
-    res.json({ token });
+    const result = await login(); // Calls the login function from appointments.js
+    res.json({ success: true, result });
   } catch (error) {
-    res.status(500).json({ error: 'Login failed', message: error.message });
+    res.status(500).json({
+      error: 'Login failed',
+      message: error.message,
+      status: error.response?.status,
+      response: error.response?.data,
+    });
   }
 });
 
@@ -64,28 +70,53 @@ app.get('/appointments/:locationId', async (req, res) => {
   }
 });
 
-// Route to fetch appointments for all locations
+// Route to fetch appointments for configured locations (original set)
 app.get('/appointments', async (req, res) => {
-    try {
-      let allAppointments = [];
-      const locationIds = Object.keys(locations); // Assuming locations are provided via environment variables
-      for (const locationId of locationIds) {
-        const appointments = await fetchAppointments(locationId);
-        if (appointments) {
-          allAppointments = allAppointments.concat(appointments);
-        }
+  try {
+    let allAppointments = [];
+    const locationIds = Object.keys(locations);
+    for (const locationId of locationIds) {
+      const appointments = await fetchAppointments(locationId);
+      if (appointments) {
+        allAppointments = allAppointments.concat(appointments);
       }
-      const upcomingAppointments = filterAppointmentsWithinPeriod(allAppointments);
-      if (upcomingAppointments.length > 0) {
-        const formattedAppointments = formatAppointments(upcomingAppointments); // Format the appointments as a list
-        res.json({ appointments: formattedAppointments });
-      } else {
-        const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
-        res.json({ message: `No appointments available within the next ${timePeriod}.` });
-      }
-    } catch (error) {
-      res.status(500).json({ error: 'Error fetching appointments', message: error.message });
     }
+    const upcomingAppointments = filterAppointmentsWithinPeriod(allAppointments);
+    if (upcomingAppointments.length > 0) {
+      const formattedAppointments = formatAppointments(upcomingAppointments);
+      res.json({ appointments: formattedAppointments });
+    } else {
+      const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
+      res.json({ message: `No appointments available within the next ${timePeriod}.` });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching appointments', message: error.message });
+  }
+});
+
+// Route to fetch appointments for ALL locations in all-locations.json (ignores configured subset)
+app.get('/appointments-all', async (req, res) => {
+  try {
+    let allAppointments = [];
+    const locationIds = Object.keys(allLocations);
+    for (const locationId of locationIds) {
+      const appointments = await fetchAppointments(locationId);
+      if (appointments) {
+        allAppointments = allAppointments.concat(appointments);
+      }
+    }
+    // Still respect the time window so the data is meaningful
+    const upcomingAppointments = filterAppointmentsWithinPeriod(allAppointments);
+    if (upcomingAppointments.length > 0) {
+      const formattedAppointments = formatAppointments(upcomingAppointments);
+      res.json({ appointments: formattedAppointments });
+    } else {
+      const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
+      res.json({ message: `No appointments available within the next ${timePeriod}.` });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching all-location appointments', message: error.message });
+  }
 });
 
 // Express API endpoint to fetch arguments (like exam type, locations, etc.)

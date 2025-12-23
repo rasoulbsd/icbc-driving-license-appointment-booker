@@ -48,42 +48,36 @@ async function loadToken() {
   }
 }
 
-// Login and get a new bearer token
+// Login (ICBC currently does not return a bearer token header; this just validates credentials/session)
 async function login() {
   try {
-    // Make the login request with Authorization header
-
-    const response = await axios.put(LOGIN_API_URL, {
-    //   username: process.env.ICBC_USERNAME,
-      keyword: process.env.ICBC_KEYWORD,
-      drvrLastName: process.env.LAST_NAME,
-      licenceNumber: process.env.LICENSE_NUMBER,
-    }, {
-      headers: { 
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-        // 'Authorization': `Bearer ${process.env.BEARER_TOKEN}` // Assuming BEARER_TOKEN is provided in the environment variables
+    // Make the login request with cookies (same as your working curl)
+    const response = await axios.put(
+      LOGIN_API_URL,
+      {
+        keyword: process.env.ICBC_KEYWORD,
+        drvrLastName: process.env.LAST_NAME,
+        licenceNumber: process.env.LICENSE_NUMBER,
       },
-    });
-    
-    // Extract the token from the response and save it
-    const token = response.headers.authorization.split(' ')[1];
-    await saveToken(token);
-    logMessage('Successfully logged in and updated bearer token.');
-    return token;
+      {
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          ...(process.env.ICBC_COOKIES ? { Cookie: process.env.ICBC_COOKIES } : {})
+        },
+      },
+    );
+
+    logMessage(`Successfully logged in to ICBC. Status: ${response.status}`);
+    // In case ICBC ever returns a token in the body in the future:
+    return response.data || { status: response.status };
   } catch (error) {
-    logMessage(`Login failed: ${error.message}`);
+    const status = error.response?.status;
+    const data = error.response?.data;
+    const errMsg = `Login failed: ${error.message}${status ? ` (status ${status})` : ''}${data ? ` | response: ${JSON.stringify(data)}` : ''}`;
+    logMessage(errMsg);
     throw error;
   }
-}
-
-// Get a valid bearer token
-async function getBearerToken() {
-  let token = await loadToken();
-  if (!token) {
-    token = await login();
-  }
-  return token;
 }
 
 // Function to get today's date in YYYY-MM-DD format
@@ -95,7 +89,6 @@ function getToday() {
 // Function to fetch appointments
 async function fetchAppointments(locationId, limit = 10) {
   const today = getToday();
-  let token = await getBearerToken();
 
   try {
     logMessage(`Fetching appointments for location ${locationId}...`);
@@ -112,7 +105,7 @@ async function fetchAppointments(locationId, limit = 10) {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        Authorization: `Bearer ${token}`,
+        ...(process.env.ICBC_COOKIES ? { Cookie: process.env.ICBC_COOKIES } : {})
       },
     });
     logMessage(`Successfully fetched appointments for location ${locationId}`);
@@ -150,9 +143,13 @@ function formatAppointments(appointments) {
   return appointments
     .sort((a, b) => new Date(a.appointmentDt.date) - new Date(b.appointmentDt.date)) // Sort by appointment date
     .map(appt => {
-      const location = locations[appt.posId] || 'Unknown Location';
+      const loc = locations[appt.posId];
       return {
-        location: location,
+        location: {
+          id: appt.posId,
+          name: loc?.name || loc || 'Unknown Location',
+          postalCode: loc?.postalCode || '',
+        },
         date: appt.appointmentDt.date,
         dayOfWeek: appt.appointmentDt.dayOfWeek,
         startTime: appt.startTm,
@@ -175,6 +172,5 @@ module.exports = {
   filterAppointmentsWithinPeriod,
   formatAppointments,
   sendLongMessage,
-  login,
-  getBearerToken
+  login
 };
