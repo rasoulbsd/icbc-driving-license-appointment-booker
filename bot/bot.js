@@ -5,9 +5,62 @@ const axios = require('axios');
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const TELEGRAM_CHANNEL_ID_ALL = process.env.TELEGRAM_CHANNEL_ID_ALL;
-const API_URL = process.env.API_URL || 'http://localhost:3000/appointments';
-const API_URL_ALL = process.env.API_URL_ALL || 'http://localhost:3000/appointments-all';
+const LOCATION_SEARCH = process.env.LOCATION_SEARCH || 'north vancouver';
+const USE_PLAYWRIGHT_API = process.env.USE_PLAYWRIGHT_API === 'true'; // Use new Playwright API
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true'; // New environment variable
+
+// Determine if we're in dev or production mode
+// Defaults to production if not specified
+const BOT_MODE = (process.env.BOT_MODE || 'production').toLowerCase();
+const isDevMode = BOT_MODE === 'dev' || BOT_MODE === 'development';
+
+// Detect if running in Docker or locally
+// In Docker: use service name (e.g., "backend")
+// Locally: use localhost
+const isDocker = process.env.DOCKER_ENV === 'true' || process.env.IN_DOCKER === 'true' || 
+                 (process.env.API_URL && process.env.API_URL.includes('backend:'));
+
+// Determine API URLs based on mode (dev/prod) and environment (Docker/local)
+// Priority: 1. DEV_API_URL/PROD_API_URL (mode-specific), 2. API_URL (legacy), 3. Auto-detect
+let API_URL, API_URL_ALL, API_URL_SEARCH;
+
+if (isDevMode) {
+    // Development mode - use DEV_API_URL if set, otherwise fall back to auto-detect
+    if (process.env.DEV_API_URL) {
+        API_URL = process.env.DEV_API_URL;
+        API_URL_ALL = process.env.DEV_API_URL_ALL || API_URL.replace('/appointments', '/appointments-all');
+        API_URL_SEARCH = process.env.DEV_API_URL_SEARCH || API_URL.replace('/appointments', '/appointments/search');
+    } else {
+        // Auto-detect for dev mode
+        const BACKEND_HOST = process.env.DEV_BACKEND_HOST || process.env.BACKEND_HOST || (isDocker ? 'backend' : 'localhost');
+        const BACKEND_PORT = process.env.DEV_BACKEND_PORT || process.env.BACKEND_PORT || process.env.PORT || '3000';
+        API_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments`;
+        API_URL_ALL = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments-all`;
+        API_URL_SEARCH = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments/search`;
+    }
+} else {
+    // Production mode - use PROD_API_URL if set, otherwise fall back to auto-detect
+    if (process.env.PROD_API_URL) {
+        API_URL = process.env.PROD_API_URL;
+        API_URL_ALL = process.env.PROD_API_URL_ALL || API_URL.replace('/appointments', '/appointments-all');
+        API_URL_SEARCH = process.env.PROD_API_URL_SEARCH || API_URL.replace('/appointments', '/appointments/search');
+    } else {
+        // Auto-detect for production mode
+        const BACKEND_HOST = process.env.PROD_BACKEND_HOST || process.env.BACKEND_HOST || (isDocker ? 'backend' : 'localhost');
+        const BACKEND_PORT = process.env.PROD_BACKEND_PORT || process.env.BACKEND_PORT || process.env.PORT || '3000';
+        API_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments`;
+        API_URL_ALL = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments-all`;
+        API_URL_SEARCH = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments/search`;
+    }
+}
+
+// Legacy support: If API_URL is explicitly set (not mode-specific), use it
+// This allows backward compatibility
+if (process.env.API_URL && !process.env.DEV_API_URL && !process.env.PROD_API_URL) {
+    API_URL = process.env.API_URL;
+    API_URL_ALL = process.env.API_URL_ALL || API_URL.replace('/appointments', '/appointments-all');
+    API_URL_SEARCH = process.env.API_URL_SEARCH || API_URL.replace('/appointments', '/appointments/search');
+}
 
 // Configurable update intervals (in minutes)
 const UPDATE_INTERVALS = process.env.UPDATE_INTERVALS ? 
@@ -33,42 +86,299 @@ function getTimePeriodText(days) {
   return `${Math.floor(days / 365)} years`;
 }
 
-// Fetch appointments using Axios (for selected locations)
-async function fetchAppointments() {
+// Helper function to trigger token renewal
+async function renewToken() {
     try {
-        const { data } = await axios.get(API_URL);
+        const tokenRenewalUrl = `${API_URL.replace('/appointments', '/token/renew')}`;
+        console.log(`🔄 Attempting to renew bearer token...`);
+        const response = await axios.get(tokenRenewalUrl, {
+            timeout: 180000 // 3 minutes timeout for Playwright
+        });
+        
+        if (response.data && response.data.success) {
+            console.log(`✅ Bearer token renewed successfully`);
+            return true;
+        } else {
+            console.log(`⚠️ Token renewal returned: ${JSON.stringify(response.data)}`);
+            return false;
+        }
+    } catch (error) {
+        console.error(`❌ Token renewal failed: ${error.message}`);
+        return false;
+    }
+}
 
-        if (!data.appointments || data.appointments.length === 0) {
-            const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
-            return `No appointments available within the next ${timePeriod}.`;
+// Fetch appointments using Axios (for selected locations)
+async function fetchAppointments(retryOnAuthError = true) {
+    try {
+        // Use POST to send bearer token and personal info in body (more reliable than query params)
+        const requestBody = {
+            debugMode: DEBUG_MODE ? true : undefined
+        };
+        
+        // Add bearer token if available from env (optional - backend will use saved token if not provided)
+        if (process.env.BEARER_TOKEN) {
+            requestBody.bearerToken = process.env.BEARER_TOKEN;
+        }
+        
+        // Add personal info if available from env (optional - backend will use env vars if not provided)
+        if (process.env.EXAM_TYPE) {
+            requestBody.examType = process.env.EXAM_TYPE;
+        }
+        if (process.env.LAST_NAME) {
+            requestBody.lastName = process.env.LAST_NAME;
+        }
+        if (process.env.LICENSE_NUMBER || process.env.BCID_NUMBER) {
+            requestBody.licenseNumber = process.env.LICENSE_NUMBER || process.env.BCID_NUMBER;
+        }
+        
+        // Remove undefined values
+        Object.keys(requestBody).forEach(key => requestBody[key] === undefined && delete requestBody[key]);
+        
+        // Log what we're sending (without sensitive data)
+        console.log(`📤 Sending request to ${API_URL}`);
+        console.log(`   Parameters: ${Object.keys(requestBody).filter(k => k !== 'bearerToken').join(', ')}${requestBody.bearerToken ? ' (with bearerToken)' : ''}`);
+        
+        const { data } = await axios.post(API_URL, requestBody, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Handle error responses
+        if (data.error) {
+            // Check if it's an authentication/token error (401, 403, or 400 with token-related message)
+            const isTokenError = data.status === 401 || 
+                                 data.status === 403 || 
+                                 (data.status === 400 && (
+                                     (data.message && (
+                                         data.message.toLowerCase().includes('token') ||
+                                         data.message.toLowerCase().includes('unauthorized') ||
+                                         data.message.toLowerCase().includes('payload does not match')
+                                     )) ||
+                                     (data.data && typeof data.data === 'string' && data.data.toLowerCase().includes('token'))
+                                 ));
+            
+            // If token error and we haven't retried, try renewing token
+            if (retryOnAuthError && isTokenError) {
+                console.log(`⚠️ Got ${data.status} error (likely token issue). Attempting to renew token...`);
+                const renewed = await renewToken();
+                if (renewed) {
+                    // Wait a bit for token to be saved
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    // Retry once after token renewal
+                    return await fetchAppointments(false);
+                }
+            }
+            
+            console.error("❌ API Error:", data.message || data.error);
+            return `⚠️ *Error:* ${data.message || data.error}\n_Status: ${data.status || 'Unknown'}_`;
         }
 
-        console.log(data.appointments)
+        // Handle message responses (no appointments)
+        if (data.message && !data.appointments) {
+            return data.message;
+        }
+
+        // Handle appointments
+        if (!data.appointments || data.appointments.length === 0) {
+            const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
+            let message = `No appointments available within the next ${timePeriod}.`;
+            
+            // Include additional info if available
+            if (data.notFoundLocations && data.notFoundLocations.length > 0) {
+                message += `\n\n_${data.notFoundLocations.length} location(s) returned 404._`;
+            }
+            if (data.errors && data.errors.length > 0) {
+                message += `\n\n_${data.errors.length} location(s) had errors._`;
+            }
+            
+            return message;
+        }
+
         return data.appointments
-        .map(app => `📍 *${app.location.name}*\n _${app.location.postalCode}_\n📅 ${app.date} - ${app.dayOfWeek} - ${app.startTime}`)
-        .join("\n\n");
+            .map(app => `📍 *${app.location.name}*\n _${app.location.postalCode}_\n📅 ${app.date} - ${app.dayOfWeek} - ${app.startTime}`)
+            .join("\n\n");
     } catch (error) {
+        // Handle authentication/token errors by attempting token renewal
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+        const errorMessage = errorData?.message || errorData?.data || error.message;
+        
+        // Check if it's a token-related error
+        const isTokenError = status === 401 || 
+                            status === 403 || 
+                            (status === 400 && errorMessage && (
+                                errorMessage.toLowerCase().includes('token') ||
+                                errorMessage.toLowerCase().includes('unauthorized') ||
+                                errorMessage.toLowerCase().includes('payload does not match')
+                            ));
+        
+        if (retryOnAuthError && isTokenError) {
+            console.log(`⚠️ Got ${status} error (likely token issue). Attempting to renew token...`);
+            const renewed = await renewToken();
+            if (renewed) {
+                // Wait a bit for token to be saved
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Retry once after token renewal
+                return await fetchAppointments(false);
+            }
+        }
+        
         console.error("❌ Error fetching appointments:", error.message);
-        return "⚠️ Error fetching appointment data.";
+        const errorMsg = errorData?.message || errorData?.data || error.message;
+        return `⚠️ Error fetching appointment data: ${errorMsg}`;
     }
 }
 
 // Fetch appointments for ALL locations
-async function fetchAppointmentsAll() {
+async function fetchAppointmentsAll(retryOnAuthError = true) {
     try {
-        const { data } = await axios.get(API_URL_ALL);
+        // Use POST to send bearer token and personal info in body (more reliable than query params)
+        const requestBody = {
+            debugMode: DEBUG_MODE ? true : undefined
+        };
+        
+        // Add bearer token if available from env (optional - backend will use saved token if not provided)
+        if (process.env.BEARER_TOKEN) {
+            requestBody.bearerToken = process.env.BEARER_TOKEN;
+        }
+        
+        // Add personal info if available from env (optional - backend will use env vars if not provided)
+        if (process.env.EXAM_TYPE) {
+            requestBody.examType = process.env.EXAM_TYPE;
+        }
+        if (process.env.LAST_NAME) {
+            requestBody.lastName = process.env.LAST_NAME;
+        }
+        if (process.env.LICENSE_NUMBER || process.env.BCID_NUMBER) {
+            requestBody.licenseNumber = process.env.LICENSE_NUMBER || process.env.BCID_NUMBER;
+        }
+        
+        // Remove undefined values
+        Object.keys(requestBody).forEach(key => requestBody[key] === undefined && delete requestBody[key]);
+        
+        // Log what we're sending (without sensitive data) for debugging
+        const logBody = { ...requestBody };
+        if (logBody.bearerToken) logBody.bearerToken = '***';
+        if (logBody.licenseNumber) logBody.licenseNumber = logBody.licenseNumber.substring(0, 2) + '***';
+        if (logBody.lastName) logBody.lastName = logBody.lastName.substring(0, 2) + '***';
+        console.log(`📤 Request to ${API_URL_ALL}:`, JSON.stringify(logBody, null, 2));
+        
+        const { data } = await axios.post(API_URL_ALL, requestBody, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Handle error responses
+        if (data.error) {
+            // Check if it's an authentication/token error (401, 403, or 400 with token-related message)
+            const isTokenError = data.status === 401 || 
+                                 data.status === 403 || 
+                                 (data.status === 400 && (
+                                     (data.message && (
+                                         data.message.toLowerCase().includes('token') ||
+                                         data.message.toLowerCase().includes('unauthorized') ||
+                                         data.message.toLowerCase().includes('payload does not match')
+                                     )) ||
+                                     (data.data && typeof data.data === 'string' && data.data.toLowerCase().includes('token'))
+                                 ));
+            
+            // If token error and we haven't retried, try renewing token
+            if (retryOnAuthError && isTokenError) {
+                console.log(`⚠️ Got ${data.status} error (likely token issue). Attempting to renew token...`);
+                const renewed = await renewToken();
+                if (renewed) {
+                    // Wait a bit for token to be saved
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    // Retry once after token renewal
+                    return await fetchAppointmentsAll(false);
+                }
+            }
+            
+            console.error("❌ API Error:", data.message || data.error);
+            return `⚠️ *Error:* ${data.message || data.error}\n_Status: ${data.status || 'Unknown'}_`;
+        }
+
+        // Handle message responses (no appointments)
+        if (data.message && !data.appointments) {
+            return data.message;
+        }
 
         if (!data.appointments || data.appointments.length === 0) {
             const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
-            return `No appointments available within the next ${timePeriod}.`;
+            let message = `No appointments available within the next ${timePeriod}.`;
+            
+            // Include additional info if available
+            if (data.notFoundLocations && data.notFoundLocations.length > 0) {
+                message += `\n\n_${data.notFoundLocations.length} location(s) returned 404._`;
+            }
+            if (data.errors && data.errors.length > 0) {
+                message += `\n\n_${data.errors.length} location(s) had errors._`;
+            }
+            
+            return message;
         }
 
         return data.appointments
-        .map(app => `📍 *${app.location.name}* (ID: ${app.location.id})\n _${app.location.postalCode}_\n📅 ${app.date} - ${app.dayOfWeek} - ${app.startTime}`)
-        .join("\n\n");
+            .map(app => `📍 *${app.location.name}* (ID: ${app.location.id})\n _${app.location.postalCode}_\n📅 ${app.date} - ${app.dayOfWeek} - ${app.startTime}`)
+            .join("\n\n");
     } catch (error) {
+        // Handle authentication/token errors by attempting token renewal
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+        const errorMessage = errorData?.message || errorData?.data || error.message;
+        
+        // Check if it's a token-related error
+        const isTokenError = status === 401 || 
+                            status === 403 || 
+                            (status === 400 && errorMessage && (
+                                errorMessage.toLowerCase().includes('token') ||
+                                errorMessage.toLowerCase().includes('unauthorized') ||
+                                errorMessage.toLowerCase().includes('payload does not match')
+                            ));
+        
+        if (retryOnAuthError && isTokenError) {
+            console.log(`⚠️ Got ${status} error (likely token issue). Attempting to renew token...`);
+            const renewed = await renewToken();
+            if (renewed) {
+                // Wait a bit for token to be saved
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Retry once after token renewal
+                return await fetchAppointmentsAll(false);
+            }
+        }
+        
         console.error("❌ Error fetching ALL-location appointments:", error.message);
-        return "⚠️ Error fetching ALL-location appointment data.";
+        const errorMsg = errorData?.message || errorData?.data || error.message;
+        return `⚠️ Error fetching ALL-location appointment data: ${errorMsg}`;
+    }
+}
+
+// Fetch appointments using Playwright API (new method)
+async function fetchAppointmentsPlaywright() {
+    try {
+        const { data } = await axios.post(API_URL_SEARCH, {
+            location: LOCATION_SEARCH
+        });
+
+        if (!data.success || !data.appointments || data.appointments.length === 0) {
+            const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
+            return `No appointments available for "${LOCATION_SEARCH}" within the next ${timePeriod}.`;
+        }
+
+        // Format appointments from Playwright API response
+        // Format: { date: "Tuesday, February 3rd, 2026", time: "8:45 AM", location: "..." }
+        return data.appointments
+            .map(app => {
+                const locationName = app.location || LOCATION_SEARCH;
+                return `📍 *${locationName}*\n📅 ${app.date}\n🕐 ${app.time}`;
+            })
+            .join("\n\n");
+    } catch (error) {
+        console.error("❌ Error fetching Playwright appointments:", error.message);
+        return `⚠️ Error fetching appointment data for "${LOCATION_SEARCH}": ${error.message}`;
     }
 }
 
@@ -99,7 +409,9 @@ async function updateMessage() {
         });
         
         // Get appointment content (without timestamps)
-        const appointmentContent = await fetchAppointments();
+        const appointmentContent = USE_PLAYWRIGHT_API 
+            ? await fetchAppointmentsPlaywright() 
+            : await fetchAppointments();
         const allLocationsContent = TELEGRAM_CHANNEL_ID_ALL ? await fetchAppointmentsAll() : null;
         
         // Create full message with timestamps
@@ -199,9 +511,21 @@ async function updateMessage() {
 }
 
 // Start the routine
-console.log(`🚀 Bot started in ${DEBUG_MODE ? 'DEBUG' : 'PRODUCTION'} mode`);
+console.log(`🚀 Bot started in ${isDevMode ? 'DEV' : 'PRODUCTION'} mode`);
+console.log(`🐛 Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`);
+console.log(`🐳 Environment: ${isDocker ? 'Docker' : 'Local'}`);
 console.log(`⏰ Update intervals: ${UPDATE_INTERVALS.join(', ')} minutes`);
 console.log(`📅 Searching appointments within ${getTimePeriodText(APPOINTMENT_SEARCH_DAYS)}`);
+if (USE_PLAYWRIGHT_API) {
+    console.log(`🌐 Using Playwright API for location: "${LOCATION_SEARCH}"`);
+    console.log(`🔗 API URL: ${API_URL_SEARCH}`);
+} else {
+    console.log(`📡 Using traditional API endpoints`);
+    console.log(`🔗 API URL: ${API_URL}`);
+    if (TELEGRAM_CHANNEL_ID_ALL) {
+        console.log(`🔗 API URL (All Locations): ${API_URL_ALL}`);
+    }
+}
 updateMessage();
 
 // Graceful shutdown

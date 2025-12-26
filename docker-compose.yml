@@ -16,6 +16,9 @@ services:
     container_name: icbc-bot
     restart: always
     env_file: ./.env
+    environment:
+      - DOCKER_ENV=true
+      - IN_DOCKER=true
     depends_on:
       - backend
     networks:
