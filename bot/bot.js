@@ -526,23 +526,72 @@ async function updateMessage() {
     setTimeout(updateMessage, nextUpdate * 60 * 1000);
 }
 
-// Start the routine
-console.log(`🚀 Bot started in ${isDevMode ? 'DEV' : 'PROD'} mode`);
-console.log(`🐛 Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`);
-console.log(`🐳 Environment: ${isDocker ? 'Docker' : 'Local'}`);
-console.log(`⏰ Update intervals: ${UPDATE_INTERVALS.join(', ')} minutes`);
-console.log(`📅 Searching appointments within ${getTimePeriodText(APPOINTMENT_SEARCH_DAYS)}`);
-if (USE_PLAYWRIGHT_API) {
-    console.log(`🌐 Using Playwright API for location: "${LOCATION_SEARCH}"`);
-    console.log(`🔗 API URL: ${API_URL_SEARCH}`);
-} else {
-    console.log(`📡 Using traditional API endpoints`);
-    console.log(`🔗 API URL: ${API_URL}`);
-    if (ENABLE_ALL_LOCATIONS_SEARCH) {
-        console.log(`🔗 API URL (All Locations): ${API_URL_ALL}`);
+// Wait for backend to be ready before starting
+async function waitForBackend(maxRetries = 30, retryDelay = 2000) {
+    const backendHost = isDocker ? 'backend' : 'localhost';
+    const backendPort = process.env.BACKEND_PORT || process.env.PORT || '3000';
+    const healthUrl = `http://${backendHost}:${backendPort}/health`;
+    
+    console.log(`⏳ Waiting for backend to be ready at ${healthUrl}...`);
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await axios.get(healthUrl, {
+                timeout: 3000,
+                validateStatus: (status) => status === 200
+            });
+            
+            if (response.status === 200 && response.data?.status === 'ok') {
+                console.log(`✅ Backend is ready!`);
+                return true;
+            }
+        } catch (error) {
+            // Backend not ready yet, continue waiting
+            if (i < maxRetries - 1) {
+                console.log(`⏳ Backend not ready yet (attempt ${i + 1}/${maxRetries}), retrying in ${retryDelay / 1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            } else {
+                console.error(`❌ Backend did not become ready after ${maxRetries} attempts`);
+                console.error(`   Last error: ${error.message}`);
+                return false;
+            }
+        }
     }
+    
+    return false;
 }
-updateMessage();
+
+// Start the routine
+async function startBot() {
+    console.log(`🚀 Bot starting in ${isDevMode ? 'DEV' : 'PROD'} mode`);
+    console.log(`🐛 Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`);
+    console.log(`🐳 Environment: ${isDocker ? 'Docker' : 'Local'}`);
+    console.log(`⏰ Update intervals: ${UPDATE_INTERVALS.join(', ')} minutes`);
+    console.log(`📅 Searching appointments within ${getTimePeriodText(APPOINTMENT_SEARCH_DAYS)}`);
+    if (USE_PLAYWRIGHT_API) {
+        console.log(`🌐 Using Playwright API for location: "${LOCATION_SEARCH}"`);
+        console.log(`🔗 API URL: ${API_URL_SEARCH}`);
+    } else {
+        console.log(`📡 Using traditional API endpoints`);
+        console.log(`🔗 API URL: ${API_URL}`);
+        if (ENABLE_ALL_LOCATIONS_SEARCH) {
+            console.log(`🔗 API URL (All Locations): ${API_URL_ALL}`);
+        }
+    }
+    
+    // Wait for backend to be ready
+    const backendReady = await waitForBackend();
+    if (!backendReady) {
+        console.error(`❌ Failed to connect to backend. Exiting...`);
+        process.exit(1);
+    }
+    
+    console.log(`🚀 Bot started successfully!`);
+    updateMessage();
+}
+
+// Start the bot
+startBot();
 
 // Graceful shutdown
 process.on('SIGINT', () => {

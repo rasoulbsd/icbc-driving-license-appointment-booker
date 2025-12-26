@@ -45,7 +45,11 @@ let contextInstance = null;
 async function getBrowser() {
   if (!browserInstance) {
     logMessage(`Launching Playwright browser (headless: ${HEADLESS})...`);
+    // In Docker/Alpine, use system Chromium if available
+    const executablePath = process.env.CHROMIUM_PATH || (process.platform === 'linux' && process.env.IN_DOCKER === 'true' ? '/usr/bin/chromium-browser' : undefined);
+    
     browserInstance = await chromium.launch({
+      executablePath: executablePath,
       headless: HEADLESS,
       args: [
         '--no-sandbox',

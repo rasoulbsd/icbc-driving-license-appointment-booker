@@ -57,8 +57,12 @@ async function getBearerTokenWithPlaywright(customCredentials = null, headlessOp
     console.log('   Date:', process.env.ICBC_DATE || '14 March 2024');
   }
 
+  // In Docker/Alpine, use system Chromium if available
+  const executablePath = process.env.CHROMIUM_PATH || (process.platform === 'linux' && process.env.IN_DOCKER === 'true' ? '/usr/bin/chromium-browser' : undefined);
+  
   const browser = await chromium.launch({
     headless: isHeadless,
+    executablePath: executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 

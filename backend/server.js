@@ -627,6 +627,11 @@ app.post('/appointments/search', async (req, res) => {
 });
 
 // Express API endpoint to fetch arguments (like exam type, locations, etc.)
+// Health check endpoint for Docker healthcheck
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'backend', timestamp: new Date().toISOString() });
+});
+
 app.get('/api/arguments', (req, res) => {
   const args = {
     examType: process.env.EXAM_TYPE,
