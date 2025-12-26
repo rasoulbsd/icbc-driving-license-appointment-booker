@@ -225,6 +225,18 @@ async function fetchAppointments(locationId, limit = 10, retryOn403 = true, cust
     let lastName = customPersonalInfo?.lastName || process.env.LAST_NAME;
     
     // Validate required fields
+    if (!examType) {
+      return {
+        appointments: [],
+        error: {
+          status: 400,
+          statusText: 'Bad Request',
+          message: 'Missing required field: examType must be provided (either in request or EXAM_TYPE environment variable)',
+          locationId: locationId
+        }
+      };
+    }
+    
     if (!lastName || !licenseNumber) {
       return {
         appointments: [],
@@ -365,8 +377,10 @@ async function fetchAppointments(locationId, limit = 10, retryOn403 = true, cust
                             !customBearerToken // If no custom token provided, try renewal for 500 errors as a safety measure
                         ));
     
-    if (isTokenError && retryOn403 && !customBearerToken) {
-      logMessage(`⚠️ Got ${status} for location ${locationId} (token error detected). Token may be invalid or expired. Attempting to renew bearer token...`);
+    // For 500 errors, also try token renewal as they might indicate auth/session issues
+    if ((isTokenError || status === 500) && retryOn403 && !customBearerToken) {
+      const errorType = isTokenError ? 'token error' : '500 error (possibly auth-related)';
+      logMessage(`⚠️ Got ${status} for location ${locationId} (${errorType} detected). Attempting to renew bearer token...`);
       try {
         // Call the token renewal API endpoint
         const apiPort = process.env.PORT || 3000;
