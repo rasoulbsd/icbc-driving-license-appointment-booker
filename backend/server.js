@@ -71,7 +71,8 @@ async function handleFetchAppointments(req, res, locationId = null, useAllLocati
       
       const filteredAppointments = filterAppointmentsWithinPeriod(appointments, debugMode);
       if (filteredAppointments.length > 0) {
-        const formattedAppointments = formatAppointments(filteredAppointments);
+        // Use locations.json for single location
+        const formattedAppointments = formatAppointments(filteredAppointments, locations);
         res.json({ appointments: formattedAppointments });
       } else {
         const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
@@ -151,7 +152,9 @@ async function handleFetchAppointments(req, res, locationId = null, useAllLocati
           };
           
           if (filteredAppointments.length > 0) {
-            const formattedAppointments = formatAppointments(filteredAppointments);
+            // Use allLocations.json when fetching all locations to get proper location names
+            const locationMap = useAllLocations ? allLocations : locations;
+            const formattedAppointments = formatAppointments(filteredAppointments, locationMap);
             response.appointments = formattedAppointments;
           } else {
             const timePeriod = getTimePeriodText(APPOINTMENT_SEARCH_DAYS);
@@ -185,7 +188,9 @@ async function handleFetchAppointments(req, res, locationId = null, useAllLocati
       }
       
       // We have appointments, return them
-      const formattedAppointments = formatAppointments(filteredAppointments);
+      // Use allLocations.json when fetching all locations to get proper location names
+      const locationMap = useAllLocations ? allLocations : locations;
+      const formattedAppointments = formatAppointments(filteredAppointments, locationMap);
       const response = { appointments: formattedAppointments };
       
       // Still include 404 info if any

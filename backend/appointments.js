@@ -339,16 +339,30 @@ async function fetchAppointments(locationId, limit = 10, retryOn403 = true, cust
       };
     }
     
-    // If 400 (with token error), 401, or 403 and we haven't retried yet, try renewing bearer token and retry once
+    // If 400 (with token error), 401, 403, or 500 (potentially auth-related) and we haven't retried yet, try renewing bearer token and retry once
     // BUT: Skip token renewal if a custom bearer token was provided (user wants to use their own token)
     // errorData is already declared above, reuse it
     const errorMessage = (typeof errorData === 'string' ? errorData : errorData?.message || error.message || '').toLowerCase();
+    const errorDataStr = typeof errorData === 'string' ? errorData : JSON.stringify(errorData || {}).toLowerCase();
+    // 500 errors might indicate authentication issues, so check for auth-related keywords
+    // If no custom bearer token provided, we'll try token renewal for 500 errors as a safety measure
     const isTokenError = status === 401 || 
                         status === 403 || 
                         (status === 400 && (
                             errorMessage.includes('token') ||
                             errorMessage.includes('payload does not match') ||
                             errorMessage.includes('unauthorized')
+                        )) ||
+                        (status === 500 && (
+                            errorMessage.includes('token') ||
+                            errorMessage.includes('unauthorized') ||
+                            errorMessage.includes('authentication') ||
+                            errorMessage.includes('session') ||
+                            errorDataStr.includes('token') ||
+                            errorDataStr.includes('unauthorized') ||
+                            errorDataStr.includes('authentication') ||
+                            errorDataStr.includes('session') ||
+                            !customBearerToken // If no custom token provided, try renewal for 500 errors as a safety measure
                         ));
     
     if (isTokenError && retryOn403 && !customBearerToken) {
@@ -463,11 +477,14 @@ function filterAppointmentsWithinPeriod(appointments, debugMode = false) {
 }
 
 // Function to format appointment data
-function formatAppointments(appointments) {
+function formatAppointments(appointments, locationMap = null) {
+  // Use provided locationMap, or fall back to default locations
+  const locMap = locationMap || locations;
+  
   return appointments
     .sort((a, b) => new Date(a.appointmentDt.date) - new Date(b.appointmentDt.date)) // Sort by appointment date
     .map(appt => {
-      const loc = locations[appt.posId];
+      const loc = locMap[appt.posId];
       return {
         location: {
           id: appt.posId,

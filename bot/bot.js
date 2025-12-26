@@ -5,13 +5,15 @@ const axios = require('axios');
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const TELEGRAM_CHANNEL_ID_ALL = process.env.TELEGRAM_CHANNEL_ID_ALL;
+// Enable/disable ALL locations search (default: true if TELEGRAM_CHANNEL_ID_ALL is set)
+const ENABLE_ALL_LOCATIONS_SEARCH = process.env.ENABLE_ALL_LOCATIONS_SEARCH !== 'false' && !!TELEGRAM_CHANNEL_ID_ALL;
 const LOCATION_SEARCH = process.env.LOCATION_SEARCH || 'north vancouver';
 const USE_PLAYWRIGHT_API = process.env.USE_PLAYWRIGHT_API === 'true'; // Use new Playwright API
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true'; // New environment variable
 
-// Determine if we're in dev or production mode
-// Defaults to production if not specified
-const BOT_MODE = (process.env.BOT_MODE || 'production').toLowerCase();
+// Determine if we're in dev or prod mode
+// Defaults to prod if not specified
+const BOT_MODE = (process.env.BOT_MODE || 'prod').toLowerCase();
 const isDevMode = BOT_MODE === 'dev' || BOT_MODE === 'development';
 
 // Detect if running in Docker or locally
@@ -39,13 +41,13 @@ if (isDevMode) {
         API_URL_SEARCH = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments/search`;
     }
 } else {
-    // Production mode - use PROD_API_URL if set, otherwise fall back to auto-detect
+    // Prod mode - use PROD_API_URL if set, otherwise fall back to auto-detect
     if (process.env.PROD_API_URL) {
         API_URL = process.env.PROD_API_URL;
         API_URL_ALL = process.env.PROD_API_URL_ALL || API_URL.replace('/appointments', '/appointments-all');
         API_URL_SEARCH = process.env.PROD_API_URL_SEARCH || API_URL.replace('/appointments', '/appointments/search');
     } else {
-        // Auto-detect for production mode
+        // Auto-detect for prod mode
         const BACKEND_HOST = process.env.PROD_BACKEND_HOST || process.env.BACKEND_HOST || (isDocker ? 'backend' : 'localhost');
         const BACKEND_PORT = process.env.PROD_BACKEND_PORT || process.env.BACKEND_PORT || process.env.PORT || '3000';
         API_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/appointments`;
@@ -273,16 +275,21 @@ async function fetchAppointmentsAll(retryOnAuthError = true) {
 
         // Handle error responses
         if (data.error) {
-            // Check if it's an authentication/token error (401, 403, or 400 with token-related message)
+            // Check if it's an authentication/token error (401, 403, 400, or 500 with token-related message)
+            const errorMsgStr = (data.message || data.data || '').toString().toLowerCase();
             const isTokenError = data.status === 401 || 
                                  data.status === 403 || 
                                  (data.status === 400 && (
-                                     (data.message && (
-                                         data.message.toLowerCase().includes('token') ||
-                                         data.message.toLowerCase().includes('unauthorized') ||
-                                         data.message.toLowerCase().includes('payload does not match')
-                                     )) ||
-                                     (data.data && typeof data.data === 'string' && data.data.toLowerCase().includes('token'))
+                                     errorMsgStr.includes('token') ||
+                                     errorMsgStr.includes('unauthorized') ||
+                                     errorMsgStr.includes('payload does not match')
+                                 )) ||
+                                 (data.status === 500 && (
+                                     errorMsgStr.includes('token') ||
+                                     errorMsgStr.includes('unauthorized') ||
+                                     errorMsgStr.includes('authentication') ||
+                                     errorMsgStr.includes('session') ||
+                                     true // Try token renewal for all 500 errors as a safety measure
                                  ));
             
             // If token error and we haven't retried, try renewing token
@@ -329,14 +336,23 @@ async function fetchAppointmentsAll(retryOnAuthError = true) {
         const status = error.response?.status;
         const errorData = error.response?.data;
         const errorMessage = errorData?.message || errorData?.data || error.message;
+        const errorMessageStr = typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage || {});
         
-        // Check if it's a token-related error
+        // Check if it's a token-related error (including 500 errors that might be auth-related)
+        // For 500 errors, we'll try token renewal as a safety measure since they might indicate auth issues
         const isTokenError = status === 401 || 
                             status === 403 || 
                             (status === 400 && errorMessage && (
                                 errorMessage.toLowerCase().includes('token') ||
                                 errorMessage.toLowerCase().includes('unauthorized') ||
                                 errorMessage.toLowerCase().includes('payload does not match')
+                            )) ||
+                            (status === 500 && (
+                                errorMessageStr.toLowerCase().includes('token') ||
+                                errorMessageStr.toLowerCase().includes('unauthorized') ||
+                                errorMessageStr.toLowerCase().includes('authentication') ||
+                                errorMessageStr.toLowerCase().includes('session') ||
+                                true // Try token renewal for all 500 errors as a safety measure
                             ));
         
         if (retryOnAuthError && isTokenError) {
@@ -412,7 +428,7 @@ async function updateMessage() {
         const appointmentContent = USE_PLAYWRIGHT_API 
             ? await fetchAppointmentsPlaywright() 
             : await fetchAppointments();
-        const allLocationsContent = TELEGRAM_CHANNEL_ID_ALL ? await fetchAppointmentsAll() : null;
+        const allLocationsContent = ENABLE_ALL_LOCATIONS_SEARCH ? await fetchAppointmentsAll() : null;
         
         // Create full message with timestamps
         const newMessageText = `🚦 *Available Appointments (Selected Locations):*\n\n${appointmentContent}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
@@ -430,7 +446,7 @@ async function updateMessage() {
             lastAppointmentContent = appointmentContent;
 
             // Also send ALL-locations message to secondary channel in debug mode (if configured)
-            if (TELEGRAM_CHANNEL_ID_ALL && allLocationsContent) {
+            if (ENABLE_ALL_LOCATIONS_SEARCH && allLocationsContent) {
                 const allText = `🌐 *Available Appointments (ALL Locations):*\n\n${allLocationsContent}\n\n_Last updated: ${currentTime}_\n_Next update: ${nextUpdateTime}_`;
                 await bot.telegram.sendMessage(
                     TELEGRAM_CHANNEL_ID_ALL,
@@ -466,7 +482,7 @@ async function updateMessage() {
                 lastAppointmentContent = appointmentContent;
 
                 // Also send ALL-locations message to secondary channel (if configured)
-                if (TELEGRAM_CHANNEL_ID_ALL && allLocationsContent) {
+                if (ENABLE_ALL_LOCATIONS_SEARCH && allLocationsContent) {
                     const allText = `🌐 *Available Appointments (ALL Locations):*\n\n${allLocationsContent}`;
                     await bot.telegram.sendMessage(
                         TELEGRAM_CHANNEL_ID_ALL,
@@ -511,7 +527,7 @@ async function updateMessage() {
 }
 
 // Start the routine
-console.log(`🚀 Bot started in ${isDevMode ? 'DEV' : 'PRODUCTION'} mode`);
+console.log(`🚀 Bot started in ${isDevMode ? 'DEV' : 'PROD'} mode`);
 console.log(`🐛 Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`);
 console.log(`🐳 Environment: ${isDocker ? 'Docker' : 'Local'}`);
 console.log(`⏰ Update intervals: ${UPDATE_INTERVALS.join(', ')} minutes`);
@@ -522,7 +538,7 @@ if (USE_PLAYWRIGHT_API) {
 } else {
     console.log(`📡 Using traditional API endpoints`);
     console.log(`🔗 API URL: ${API_URL}`);
-    if (TELEGRAM_CHANNEL_ID_ALL) {
+    if (ENABLE_ALL_LOCATIONS_SEARCH) {
         console.log(`🔗 API URL (All Locations): ${API_URL_ALL}`);
     }
 }
