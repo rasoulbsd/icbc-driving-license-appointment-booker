@@ -415,21 +415,21 @@ async function fetchAppointments(locationId, limit = 10, retryOn403 = true, cust
         // Fallback: try the old login method if API call fails
         try {
           logMessage(`Attempting fallback login method...`);
-          const loginResult = await login();
-          if (loginResult.token) {
+        const loginResult = await login();
+        if (loginResult.token) {
             logMessage(`Bearer token extracted via fallback login`);
-          }
+        }
           await delay(1000);
           return fetchAppointments(locationId, limit, false, null, customPersonalInfo);
-        } catch (loginError) {
+      } catch (loginError) {
           logMessage(`⚠️  Fallback login also failed for location ${locationId}. Skipping...`);
-          fs.appendFileSync(
-            'error.log',
+        fs.appendFileSync(
+          'error.log',
             `${new Date().toISOString()} - Location ${locationId}: Token renewal and fallback login failed - ${renewalError.message}\n`
-          );
+        );
           return { appointments: [], error: { status: 500, message: 'Token renewal and fallback login failed', locationId } };
-        }
       }
+    }
     } else if ((status === 401 || status === 403) && customBearerToken) {
       logMessage(`⚠️ Got ${status} for location ${locationId} with custom bearer token. Token may be invalid or expired, but skipping renewal as custom token was provided.`);
       // Return error info so it can be reported to the user

@@ -122,25 +122,18 @@ async function login() {
       logMessage('⚠️  Could not find Terms and Conditions checkbox');
     }
 
-    // Click the first "Sign in" button (Sign in with your ICBC information)
-    logMessage('Looking for "Sign in with your ICBC information" button...');
+    // Click the third "Sign in" button using XPath
+    logMessage('Looking for sign-in button (third button)...');
     
-    // Try to find the button by text in the first sign-in section
-    let signInButton = page.locator('button:has-text("Sign in")').first();
+    // Use the specific XPath for the third sign-in button
+    const signInButtonXPath = '/html/body/div[2]/main/div[2]/div/div[1]/div[2]/div[4]/div/div[2]/div/div/div[1]/form/button';
+    let signInButton = page.locator(`xpath=${signInButtonXPath}`);
     let buttonCount = await signInButton.count();
-    
-    // If not found, try to find it within the first sign-in section
-    if (buttonCount === 0) {
-      // Look for button near "Sign in with your ICBC information" text
-      const icbcSignInSection = page.locator('text="Sign in with your ICBC information"').locator('..').locator('..');
-      signInButton = icbcSignInSection.locator('button:has-text("Sign in")').first();
-      buttonCount = await signInButton.count();
-    }
     
     if (buttonCount > 0) {
       const buttonText = await signInButton.textContent();
       logMessage(`Found sign-in button: "${buttonText?.trim()}"`);
-      logMessage('Clicking sign-in button...');
+      logMessage('Clicking sign-in button (third button)...');
       await signInButton.scrollIntoViewIfNeeded();
       await delay(500);
       await signInButton.click();
@@ -151,7 +144,7 @@ async function login() {
       
       logMessage(`After clicking sign-in, current URL: ${page.url()}`);
     } else {
-      throw new Error('Could not find sign-in button');
+      throw new Error('Could not find sign-in button at the specified XPath');
     }
 
     await delay(1000); // Wait for form to load
@@ -552,31 +545,38 @@ async function login() {
       await page.waitForLoadState('load', { timeout: NAVIGATION_TIMEOUT });
       logMessage(`After clicking Next, current URL: ${page.url()}`);
       
-      // Click the second button after Next
+      // Click the second button after Next (optional — step may have been removed)
       logMessage('Looking for second button...');
       const secondButtonXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[2]/div/span/div[3]/div/div[3]';
       const secondButton = page.locator(`xpath=${secondButtonXPath}`);
       const secondButtonCount = await secondButton.count();
-      
       if (secondButtonCount > 0) {
         logMessage('Found second button');
         await secondButton.scrollIntoViewIfNeeded();
         await delay(500);
         logMessage('Clicking second button...');
         await secondButton.click();
-        
-        // Wait for form to appear
         await delay(3000);
         await page.waitForLoadState('load', { timeout: NAVIGATION_TIMEOUT });
         logMessage(`After clicking second button, current URL: ${page.url()}`);
-        
-        // Fill keyword field using exact XPath
-        logMessage('Looking for keyword input field...');
+      } else {
+        logMessage('Second button not found (step may have been removed), proceeding to keyword...');
+      }
+
+      // Fill keyword field — find by input[maxlength="22"] (ICBC keyword field)
+      logMessage('Looking for keyword input field (input[maxlength="22"])...');
+      let keywordInput = page.locator('input[maxlength="22"]').first();
+      let keywordCount = await keywordInput.count();
+      if (keywordCount === 0) {
         const keywordInputXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[5]/div[3]/div/div/div[2]/div[2]/div/input';
-        const keywordInput = page.locator(`xpath=${keywordInputXPath}`);
-        const keywordCount = await keywordInput.count();
-        
-        if (keywordCount > 0) {
+        keywordInput = page.locator(`xpath=${keywordInputXPath}`);
+        keywordCount = await keywordInput.count();
+        if (keywordCount > 0) logMessage('Found keyword input via XPath fallback');
+      } else {
+        logMessage('Found keyword input via input[maxlength="22"]');
+      }
+
+      if (keywordCount > 0) {
           logMessage('Found keyword input field');
           await keywordInput.scrollIntoViewIfNeeded();
           await delay(500);
@@ -641,7 +641,7 @@ async function login() {
           logMessage('⏳ Waiting 1 second before submit...');
           await delay(1000);
         } else {
-          logMessage('⚠️  Keyword input field not found using XPath');
+          logMessage('⚠️  Keyword input field not found (input[maxlength="22"] and XPath)');
           // Fallback: try to find by attributes
           const inputs = await page.locator('input').all();
           for (let i = 0; i < inputs.length; i++) {
@@ -950,9 +950,6 @@ async function login() {
         } else {
           logMessage('⚠️  Could not find submit button');
         }
-      } else {
-        logMessage('⚠️  Second button not found using XPath');
-      }
     } else {
       logMessage('⚠️  Could not find Next button');
     }
@@ -1196,19 +1193,15 @@ async function performLoginOnPage(page) {
       }
     }
 
-    // Click the first "Sign in" button
-    logMessage('Looking for "Sign in with your ICBC information" button...');
-    let signInButton = page.locator('button:has-text("Sign in")').first();
+    // Click the third "Sign in" button using XPath
+    logMessage('Looking for sign-in button (third button)...');
+    // Use the specific XPath for the third sign-in button
+    const signInButtonXPath = '/html/body/div[2]/main/div[2]/div/div[1]/div[2]/div[4]/div/div[2]/div/div/div[1]/form/button';
+    let signInButton = page.locator(`xpath=${signInButtonXPath}`);
     let buttonCount = await signInButton.count();
     
-    if (buttonCount === 0) {
-      const icbcSignInSection = page.locator('text="Sign in with your ICBC information"').locator('..').locator('..');
-      signInButton = icbcSignInSection.locator('button:has-text("Sign in")').first();
-      buttonCount = await signInButton.count();
-    }
-    
     if (buttonCount > 0) {
-      logMessage('Clicking sign-in button...');
+      logMessage('Clicking sign-in button (third button)...');
       await signInButton.scrollIntoViewIfNeeded();
       await delay(500);
       await signInButton.click();
@@ -1274,14 +1267,22 @@ async function performLoginOnPage(page) {
         await page.locator(`xpath=${nextButtonXPath}`).click();
         await delay(3000);
         
-        // Click second button
+        // Click second button (optional — step may have been removed)
         const secondButtonXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[2]/div/span/div[3]/div/div[3]';
-        await page.locator(`xpath=${secondButtonXPath}`).click();
-        await delay(3000);
+        const secondButtonLoc = page.locator(`xpath=${secondButtonXPath}`);
+        if (await secondButtonLoc.count() > 0) {
+          await secondButtonLoc.click();
+          await delay(3000);
+        } else {
+          logMessage('Second button not found (performLoginOnPage), proceeding to keyword...');
+        }
         
-        // Fill keyword
-        const keywordInputXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[5]/div[3]/div/div/div[2]/div[2]/div/input';
-        const keywordInput = page.locator(`xpath=${keywordInputXPath}`);
+        // Fill keyword — find by input[maxlength="22"] first
+        let keywordInput = page.locator('input[maxlength="22"]').first();
+        if (await keywordInput.count() === 0) {
+          const keywordInputXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[5]/div[3]/div/div/div[2]/div[2]/div/input';
+          keywordInput = page.locator(`xpath=${keywordInputXPath}`);
+        }
         if (await keywordInput.count() > 0) {
           logMessage('Found keyword input field (performLoginOnPage)');
           await keywordInput.scrollIntoViewIfNeeded();

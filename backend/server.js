@@ -603,7 +603,7 @@ app.post('/appointments/search', async (req, res) => {
     console.error(`Error searching appointments: ${error.message}`);
     const statusCode = error.response?.status || error.status || 500;
     res.status(statusCode).json({ 
-      error: 'Error searching appointments',
+      error: 'Error searching appointments', 
       message: error.message,
       status: statusCode,
       statusText: error.response?.statusText || error.statusText,

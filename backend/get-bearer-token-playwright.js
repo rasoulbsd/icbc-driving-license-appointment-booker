@@ -203,24 +203,22 @@ async function getBearerTokenWithPlaywright(customCredentials = null, headlessOp
       console.log('   ⚠️  Checkbox not found');
     }
 
-    // Step 3: Click "Sign in" button
-    console.log('\n📋 Step 3: Clicking "Sign in" button...');
-    let signInButton = page.locator('button:has-text("Sign in")').first();
+    // Step 3: Click "Sign in" button (third button using XPath)
+    console.log('\n📋 Step 3: Clicking "Sign in" button (third button)...');
+    // Use the specific XPath for the third sign-in button
+    const signInButtonXPath = '/html/body/div[2]/main/div[2]/div/div[1]/div[2]/div[4]/div/div[2]/div/div/div[1]/form/button';
+    let signInButton = page.locator(`xpath=${signInButtonXPath}`);
     let buttonCount = await signInButton.count();
-    if (buttonCount === 0) {
-      const icbcSignInSection = page.locator('text="Sign in with your ICBC information"').locator('..').locator('..');
-      signInButton = icbcSignInSection.locator('button:has-text("Sign in")').first();
-      buttonCount = await signInButton.count();
-    }
+    
     if (buttonCount > 0) {
       await signInButton.scrollIntoViewIfNeeded();
       await delay(200); // Reduced from 500ms
       await signInButton.click();
       await page.waitForLoadState('load', { timeout: 30000 });
       await delay(1000); // Reduced from 2000ms
-      console.log(`   ✅ Sign in clicked. Current URL: ${page.url()}`);
+      console.log(`   ✅ Sign in clicked (third button). Current URL: ${page.url()}`);
     } else {
-      throw new Error('Could not find sign-in button');
+      throw new Error('Could not find sign-in button at the specified XPath');
     }
 
     // Step 4: Click "Select" button for B.C. driver's licence
@@ -322,89 +320,89 @@ async function getBearerTokenWithPlaywright(customCredentials = null, headlessOp
       console.log(`   ✅ Next clicked. Current URL: ${page.url()}`);
     }
 
-    // Step 7: Click second button
-    console.log('\n📋 Step 7: Clicking second button...');
-    const secondButtonXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[2]/div/span/div[3]/div/div[3]';
-    const secondButton = page.locator(`xpath=${secondButtonXPath}`);
-    if (await secondButton.count() > 0) {
-      await secondButton.scrollIntoViewIfNeeded();
-      await delay(200); // Reduced from 500ms
-      await secondButton.click();
-      await delay(1500); // Reduced from 3000ms
-      await page.waitForLoadState('load', { timeout: 30000 });
-      console.log(`   ✅ Second button clicked. Current URL: ${page.url()}`);
+    // Step 7: Click second button (optional — step may have been removed from ICBC page)
+    console.log('\n📋 Step 7: Looking for second button...');
+    await page.evaluate(() => document.querySelectorAll('input[maxlength="22"]'))
+    console.log('\n⚠️Skipping step 7, proceeding to keyword...');
+    // const secondButtonXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[2]/div/span/div[3]/div/div[3]';
+    // const secondButton = page.locator(`xpath=${secondButtonXPath}`);
+    // const secondButtonCount = await secondButton.count();
+    // if (secondButtonCount > 0) {
+    //   await secondButton.scrollIntoViewIfNeeded();
+    //   await delay(500);
+    //   await secondButton.click();
+    //   console.log('   ✅ Second button clicked, waiting for form to load...');
+    //   await delay(2000);
+    //   await page.waitForLoadState('load', { timeout: 30000 });
+    //   console.log(`   ✅ Second button clicked. Current URL: ${page.url()}`);
+    // } else {
+    //   console.log('   ℹ️  Second button not found (step may have been removed), proceeding to keyword...');
+    // }
+
+    // Step 8: Keyword — find by input[maxlength="22"], then click and type
+    console.log('\n📋 Step 8: Entering keyword (click then type)...');
+    let keywordInput = page.locator('input[maxlength="22"]').first();
+    const keywordByAttrCount = await keywordInput.count();
+    if (keywordByAttrCount === 0) {
+      const keywordInputXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[5]/div[3]/div/div/div[2]/div[2]/div/input';
+      keywordInput = page.locator(`xpath=${keywordInputXPath}`);
+      console.log('   Using XPath fallback for keyword input...');
+    } else {
+      console.log('   Found keyword input via input[maxlength="22"]');
     }
 
-    // Step 8: Fill keyword
-    console.log('\n📋 Step 8: Filling keyword...');
-    const keywordInputXPath = '/html/body/form/div[5]/div/div/div/div[2]/div/div[3]/div/div[3]/div[5]/div[3]/div/div/div[2]/div[2]/div/input';
-    const keywordInput = page.locator(`xpath=${keywordInputXPath}`);
-    if (await keywordInput.count() > 0) {
-      console.log('   Found keyword input field');
-      await keywordInput.scrollIntoViewIfNeeded();
-      await delay(200); // Reduced from 500ms
-      
-      // Get field attributes for debugging
-      const fieldType = await keywordInput.getAttribute('type');
-      const fieldName = await keywordInput.getAttribute('name');
-      const fieldId = await keywordInput.getAttribute('id');
-      console.log(`   Keyword field - type: ${fieldType}, name: ${fieldName}, id: ${fieldId}`);
-      
-      // Click to focus the field first
-      console.log('   Clicking keyword field to focus...');
-      await keywordInput.click();
-      await delay(200); // Reduced from 500ms
-      
-      // Clear any existing value
-      console.log('   Clearing keyword field...');
-      await keywordInput.clear();
-      await delay(200); // Reduced from 500ms
-      
-      // Verify field is empty
-      const emptyValue = await keywordInput.inputValue().catch(() => '');
-      console.log(`   Keyword field value after clear: "${emptyValue}"`);
-      
-      // Type the keyword to trigger input events
-      console.log(`   Typing keyword: ${keyword} (character by character)...`);
-      await keywordInput.type(keyword, { delay: 50 }); // Reduced from 100ms
-      await delay(500); // Reduced from 1000ms
-      
-      // Verify the keyword was actually entered
-      const enteredValue = await keywordInput.inputValue().catch(() => '');
-      console.log(`   Keyword field value after typing: "${enteredValue}"`);
-      
-      if (enteredValue !== keyword) {
-        console.log(`   ⚠️  WARNING: Keyword mismatch! Expected: "${keyword}", Got: "${enteredValue}"`);
-        console.log('   Attempting to fill again...');
-        await keywordInput.clear();
-        await delay(200); // Reduced from 500ms
-        await keywordInput.fill(keyword);
-        await delay(500); // Reduced from 1000ms
-        const retryValue = await keywordInput.inputValue().catch(() => '');
-        console.log(`   Keyword field value after retry: "${retryValue}"`);
-      }
-      
-      // Trigger additional events to ensure form recognizes the input
-      console.log('   Triggering blur event to validate field...');
-      await keywordInput.evaluate(el => {
-        el.blur();
-        el.dispatchEvent(new Event('blur', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-      await delay(300); // Reduced from 1000ms
-      
-      // Take screenshot for debugging
+    // Wait for the keyword input to be attached and visible
+    console.log('   Waiting for keyword input field...');
+    try {
+      await keywordInput.waitFor({ state: 'attached', timeout: 15000 });
+      await keywordInput.waitFor({ state: 'visible', timeout: 10000 });
+      console.log('   ✅ Keyword input field is visible');
+    } catch (waitError) {
+      console.log(`   ⚠️  Keyword input field not visible within timeout: ${waitError.message}`);
       if (!isHeadless) {
-        await page.screenshot({ path: 'icbc-keyword-filled-token-renewal.png', fullPage: true });
-        console.log('   📸 Screenshot saved: icbc-keyword-filled-token-renewal.png');
+        await page.screenshot({ path: 'icbc-keyword-field-not-found.png', fullPage: true });
+        console.log('   📸 Screenshot saved: icbc-keyword-field-not-found.png');
       }
-      
-      console.log(`   ✅ Keyword filled: ${keyword}`);
-      await delay(300); // Reduced from 1000ms
-    } else {
-      console.log('   ⚠️  Keyword input field not found using XPath');
+      throw new Error('Could not find keyword input field (tried input[maxlength="22"] and XPath)');
     }
+
+    await keywordInput.scrollIntoViewIfNeeded();
+    await delay(300);
+
+    // Click on the input so it receives focus and accepts typing (required by ICBC)
+    console.log('   Clicking keyword field to focus (required before typing)...');
+    await keywordInput.click({ timeout: 5000 });
+    await delay(400);
+
+    // Clear any existing value, then type character-by-character (no fill/value insertion)
+    await keywordInput.clear();
+    await delay(150);
+    console.log(`   Typing keyword character by character...`);
+    await keywordInput.type(keyword, { delay: 80 });
+    await delay(300);
+
+    const enteredValue = await keywordInput.inputValue().catch(() => '');
+    console.log(`   Keyword field value after typing: "${enteredValue}"`);
+
+    if (enteredValue !== keyword) {
+      console.log(`   ⚠️  WARNING: Keyword mismatch. Expected: "${keyword}", Got: "${enteredValue}"`);
+    }
+
+    // Blur so form validation sees the value
+    await keywordInput.evaluate(el => {
+      el.blur();
+      el.dispatchEvent(new Event('blur', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await delay(200);
+
+    if (!isHeadless) {
+      await page.screenshot({ path: 'icbc-keyword-filled-token-renewal.png', fullPage: true });
+      console.log('   📸 Screenshot saved: icbc-keyword-filled-token-renewal.png');
+    }
+
+    console.log(`   ✅ Keyword step completed (typed into field)`);
+    await delay(300);
 
     // Step 9: Click Submit button
     console.log('\n📋 Step 9: Clicking Submit button...');
