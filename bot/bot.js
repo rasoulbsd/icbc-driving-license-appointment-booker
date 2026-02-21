@@ -72,6 +72,31 @@ const UPDATE_INTERVALS = process.env.UPDATE_INTERVALS ?
 // Configurable appointment search period (in days)
 const APPOINTMENT_SEARCH_DAYS = parseInt(process.env.APPOINTMENT_SEARCH_DAYS) || 60; // Default 60 days
 
+// Print resolved config (mask secrets) so .env can be verified
+function printConfig() {
+  console.log('\n📋 Bot config (from .env / environment):');
+  console.log('   BOT_MODE:', BOT_MODE);
+  console.log('   isDevMode:', isDevMode);
+  console.log('   isDocker:', isDocker, '(DOCKER_ENV=%s, IN_DOCKER=%s)', process.env.DOCKER_ENV || '', process.env.IN_DOCKER || '');
+  console.log('   API_URL:', API_URL);
+  console.log('   API_URL_ALL:', API_URL_ALL);
+  console.log('   API_URL_SEARCH:', API_URL_SEARCH);
+  console.log('   TELEGRAM_BOT_TOKEN:', TELEGRAM_BOT_TOKEN ? '(set)' : '(not set)');
+  console.log('   TELEGRAM_CHANNEL_ID:', TELEGRAM_CHANNEL_ID || '(not set)');
+  console.log('   TELEGRAM_CHANNEL_ID_ALL:', TELEGRAM_CHANNEL_ID_ALL || '(not set)');
+  console.log('   LOCATION_SEARCH:', LOCATION_SEARCH);
+  console.log('   ENABLE_ALL_LOCATIONS_SEARCH:', ENABLE_ALL_LOCATIONS_SEARCH);
+  console.log('   USE_PLAYWRIGHT_API:', USE_PLAYWRIGHT_API);
+  console.log('   DEBUG_MODE:', DEBUG_MODE);
+  console.log('   UPDATE_INTERVALS:', UPDATE_INTERVALS.join(', '));
+  console.log('   APPOINTMENT_SEARCH_DAYS:', APPOINTMENT_SEARCH_DAYS);
+  if (process.env.API_URL) console.log('   (raw) process.env.API_URL:', process.env.API_URL);
+  if (process.env.PROD_API_URL) console.log('   (raw) process.env.PROD_API_URL:', process.env.PROD_API_URL);
+  if (process.env.DEV_API_URL) console.log('   (raw) process.env.DEV_API_URL:', process.env.DEV_API_URL);
+  console.log('');
+}
+printConfig();
+
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
 let lastMessageId = null; // Store the last message ID to delete
